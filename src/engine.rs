@@ -126,6 +126,10 @@ struct Engine<'a> {
     table: Option<TableBuilder>,
     in_metadata: bool,
     fn_skip: usize,
+
+    /// When true (footnote sub-render), links are flattened to plain runs so
+    /// they never allocate an `r:id` that footnotes.xml.rels would not register.
+    flatten_links: bool,
 }
 
 /// Public entry point used by `lib.rs`: build a `Docx` from Markdown.
@@ -177,6 +181,9 @@ fn collect_footnotes(md: &str, opts: &ConvertOptions) -> HashMap<String, Vec<Par
                         let lbl = label.take().unwrap();
                         let events = std::mem::take(&mut buf);
                         let mut sub = Engine::new(opts, HashMap::new());
+                        // Links inside footnote bodies must not become real
+                        // hyperlinks (their r:id would dangle in footnotes.xml).
+                        sub.flatten_links = true;
                         sub.process_events(events.into_iter());
                         sub.finish();
                         let paras: Vec<Paragraph> = sub
@@ -229,6 +236,7 @@ impl<'a> Engine<'a> {
             table: None,
             in_metadata: false,
             fn_skip: 0,
+            flatten_links: false,
         }
     }
 
@@ -263,6 +271,25 @@ impl<'a> Engine<'a> {
             return;
         }
 
+        // While an image is open, every inline leaf is part of its alt text, not
+        // body content. Capture text-bearing events and swallow the rest so they
+        // cannot escape the image and corrupt the surrounding paragraph.
+        if let Some(image) = self.image.as_mut() {
+            match &ev {
+                Event::Text(t) | Event::Code(t) | Event::InlineMath(t) => {
+                    image.alt.push_str(t);
+                    return;
+                }
+                Event::SoftBreak | Event::HardBreak => {
+                    image.alt.push(' ');
+                    return;
+                }
+                // The matching End(Image) must still be processed below.
+                Event::End(TagEnd::Image) => {}
+                _ => return,
+            }
+        }
+
         match ev {
             Event::Start(tag) => self.start_tag(tag),
             Event::End(tag) => self.end_tag(tag),
@@ -272,10 +299,10 @@ impl<'a> Engine<'a> {
                 self.emit_run(r);
             }
             Event::InlineMath(t) => {
-                let r = self.styled_run(&t, true);
+                let r = self.math_run(&t);
                 self.emit_run(r);
             }
-            Event::DisplayMath(t) => self.push_display_math(&t),
+            Event::DisplayMath(t) => self.on_display_math(&t),
             Event::Html(s) => self.on_html_block(&s),
             Event::InlineHtml(s) => self.on_inline_html(&s),
             Event::FootnoteReference(label) => self.push_footnote_ref(&label),
@@ -461,8 +488,70 @@ impl<'a> Engine<'a> {
         if self.heading.is_some() {
             self.heading_text.push_str(t);
         }
-        let r = self.styled_run(t, false);
-        self.emit_run(r);
+        self.emit_autolinked(t);
+    }
+
+    /// Emit text, turning bare `http(s)://` URLs into hyperlinks (GFM extended
+    /// autolinking, which pulldown-cmark does not perform). Suppressed inside an
+    /// explicit link and in footnote bodies (where links are flattened).
+    fn emit_autolinked(&mut self, t: &str) {
+        if self.link.is_some() || self.flatten_links {
+            let r = self.styled_run(t, false);
+            self.emit_run(r);
+            return;
+        }
+        let mut last = 0;
+        let mut search = 0;
+        while let Some(rel) = t[search..].find("http") {
+            let s = search + rel;
+            let rest = &t[s..];
+            let is_scheme = rest.starts_with("http://") || rest.starts_with("https://");
+            let boundary_ok = s == 0
+                || !t[..s]
+                    .chars()
+                    .next_back()
+                    .is_some_and(|c| c.is_alphanumeric());
+            if is_scheme && boundary_ok {
+                let mut e = s;
+                for (off, ch) in rest.char_indices() {
+                    if ch.is_whitespace() || matches!(ch, '<' | '>' | '"' | '`' | '|') {
+                        break;
+                    }
+                    e = s + off + ch.len_utf8();
+                }
+                // Strip trailing punctuation that is unlikely to be part of the URL.
+                while e > s {
+                    let c = t[..e].chars().next_back().unwrap();
+                    if matches!(
+                        c,
+                        '.' | ',' | ';' | ':' | '!' | '?' | ')' | ']' | '}' | '\'' | '"'
+                    ) {
+                        e -= c.len_utf8();
+                    } else {
+                        break;
+                    }
+                }
+                let scheme_len = if rest.starts_with("https://") { 8 } else { 7 };
+                if e > s + scheme_len {
+                    if last < s {
+                        let r = self.styled_run(&t[last..s], false);
+                        self.emit_run(r);
+                    }
+                    let url = t[s..e].to_string();
+                    let run = self.styled_run(&url, false).style(styles::HYPERLINK);
+                    let h = Hyperlink::new(url, HyperlinkType::External).add_run(run);
+                    self.target_buf().push(Inline::Link(Box::new(h)));
+                    last = e;
+                    search = e;
+                    continue;
+                }
+            }
+            search = s + 4;
+        }
+        if last < t.len() {
+            let r = self.styled_run(&t[last..], false);
+            self.emit_run(r);
+        }
     }
 
     fn on_soft_break(&mut self) {
@@ -513,7 +602,7 @@ impl<'a> Engine<'a> {
                     Shading::new()
                         .shd_type(ShdType::Clear)
                         .color("auto")
-                        .fill("EEEEEE"),
+                        .fill(styles::INLINE_CODE_FILL),
                 );
         }
         r
@@ -567,25 +656,47 @@ impl<'a> Engine<'a> {
         self.blocks.push(BlockOut::Para(p));
     }
 
-    /// Apply list numbering / block-quote styling to a body paragraph.
+    /// Left indent contributed by the open block-quote nesting, in twips.
+    fn quote_indent(&self) -> i32 {
+        if self.quote_depth > 0 {
+            (self.quote_depth as i32)
+                .saturating_mul(360)
+                .saturating_add(360)
+        } else {
+            0
+        }
+    }
+
+    /// Left indent contributed by the open list nesting, in twips.
+    fn list_indent(&self) -> i32 {
+        self.list_stack.last().map_or(0, |l| {
+            (l.level as i32).saturating_add(1).saturating_mul(720)
+        })
+    }
+
+    /// Apply list numbering and block-quote styling to a body paragraph. The
+    /// list and quote indents are combined into a single `.indent` call so the
+    /// two do not clobber each other (docx-rs keeps only the last `indPr`).
     fn decorate(&mut self, mut p: Paragraph) -> Paragraph {
+        let mut numbered = false;
         if let Some(list) = self.list_stack.last().copied() {
             if let Some(item) = self.item_stack.last_mut() {
-                let cont_indent = ((list.level as i32) + 1) * 720;
-                if item.task.is_some() {
-                    p = p.indent(Some(cont_indent), None, None, None);
-                } else if !item.numbered {
+                if item.task.is_none() && !item.numbered {
                     p = p.numbering(NumberingId::new(list.num_id), IndentLevel::new(0));
                     item.numbered = true;
-                } else {
-                    p = p.indent(Some(cont_indent), None, None, None);
+                    numbered = true;
                 }
             }
         }
         if self.quote_depth > 0 {
             p = p.style(styles::QUOTE);
-            if self.quote_depth > 1 {
-                p = p.indent(Some(self.quote_depth as i32 * 360 + 360), None, None, None);
+        }
+        // A numbered paragraph already carries indent from its numbering level;
+        // adding more would fight it. Everything else gets the combined indent.
+        if !numbered {
+            let indent = self.list_indent().saturating_add(self.quote_indent());
+            if indent > 0 {
+                p = p.indent(Some(indent), None, None, None);
             }
         }
         p
@@ -598,10 +709,13 @@ impl<'a> Engine<'a> {
         let mut p = Paragraph::new();
         let mut bid = None;
         if self.opts.heading_anchors {
+            // Slugify the explicit `{#id}` too, so it matches the link side
+            // (which always slugifies `#target`).
             let raw = self
                 .heading_id
                 .take()
                 .filter(|s| !s.is_empty())
+                .map(|id| slugify(&id))
                 .unwrap_or_else(|| slugify(&self.heading_text));
             let name = self.unique_anchor(bookmark_name(&raw));
             let id = self.next_bookmark();
@@ -618,6 +732,12 @@ impl<'a> Engine<'a> {
             p = p.add_bookmark_end(id);
         }
         p = p.style(style);
+        // Honour list/quote nesting so a heading inside a quote or list item is
+        // indented to match its container.
+        let indent = self.list_indent().saturating_add(self.quote_indent());
+        if indent > 0 {
+            p = p.indent(Some(indent), None, None, None);
+        }
         self.blocks.push(BlockOut::Para(p));
         self.heading_text.clear();
         self.heading_id = None;
@@ -628,6 +748,19 @@ impl<'a> Engine<'a> {
             return;
         };
         if link.runs.is_empty() {
+            return;
+        }
+        // In footnote bodies, flatten links to styled runs (appending the URL
+        // for external links) so no dangling relationship id is produced.
+        if self.flatten_links {
+            for r in link.runs {
+                self.target_buf()
+                    .push(Inline::Run(r.style(styles::HYPERLINK)));
+            }
+            if !link.anchor && !link.target.is_empty() {
+                let note = self.styled_run(&format!(" ({})", link.target), false);
+                self.target_buf().push(Inline::Run(note));
+            }
             return;
         }
         let kind = if link.anchor {
@@ -647,8 +780,7 @@ impl<'a> Engine<'a> {
             return;
         };
         match self.load_image(&img) {
-            Some((bytes, w_emu, h_emu)) => {
-                let pic = Pic::new(&bytes).size(w_emu, h_emu);
+            Some(pic) => {
                 let r = Run::new().add_image(pic);
                 self.emit_run(r);
             }
@@ -658,8 +790,19 @@ impl<'a> Engine<'a> {
                 } else {
                     img.alt.clone()
                 };
-                let r = self.styled_run(&format!("[image: {label}]"), false);
-                self.emit_run(r);
+                // A standalone image (sole content of its paragraph) becomes a
+                // captioned placeholder; an inline one stays inline but muted.
+                if self.pending.is_empty() && self.link.is_none() && self.table.is_none() {
+                    let r = Run::new().add_text(format!("[image: {label}]"));
+                    let p = Paragraph::new().style(styles::CAPTION).add_run(r);
+                    self.blocks.push(BlockOut::Para(p));
+                } else {
+                    let r = self
+                        .styled_run(&format!("[image: {label}]"), false)
+                        .italic()
+                        .color(styles::CAPTION_COLOR);
+                    self.emit_run(r);
+                }
             }
         }
     }
@@ -686,7 +829,8 @@ impl<'a> Engine<'a> {
             }
         }
 
-        let cw = self.opts.page.content_width() as usize;
+        let indent = self.list_indent().saturating_add(self.quote_indent());
+        let cw = (self.opts.page.content_width() as usize).saturating_sub(indent.max(0) as usize);
         let cell = TableCell::new()
             .shading(
                 Shading::new()
@@ -695,10 +839,14 @@ impl<'a> Engine<'a> {
                     .fill(styles::CODE_FILL),
             )
             .add_paragraph(para);
-        let table = Table::new(vec![TableRow::new(vec![cell])])
+        // `without_borders` keeps the shaded box but drops the default black grid.
+        let mut table = Table::without_borders(vec![TableRow::new(vec![cell])])
             .set_grid(vec![cw])
             .width(cw, WidthType::Dxa)
             .layout(TableLayoutType::Fixed);
+        if indent > 0 {
+            table = table.indent(indent);
+        }
         self.blocks.push(BlockOut::Table(Box::new(table)));
         self.in_code = false;
     }
@@ -743,8 +891,11 @@ impl<'a> Engine<'a> {
         let Some(t) = self.table.take() else {
             return;
         };
+        let indent = self.list_indent().saturating_add(self.quote_indent());
         let ncols = t.aligns.len().max(1);
-        let cw = (self.opts.page.content_width() as usize).max(ncols);
+        let cw = (self.opts.page.content_width() as usize)
+            .saturating_sub(indent.max(0) as usize)
+            .max(ncols);
         let col_w = cw / ncols;
         let grid = vec![col_w; ncols];
 
@@ -758,10 +909,13 @@ impl<'a> Engine<'a> {
         if rows.is_empty() {
             return;
         }
-        let table = Table::new(rows)
+        let mut table = Table::new(rows)
             .set_grid(grid)
             .width(cw, WidthType::Dxa)
             .layout(TableLayoutType::Fixed);
+        if indent > 0 {
+            table = table.indent(indent);
+        }
         self.blocks.push(BlockOut::Table(Box::new(table)));
     }
 
@@ -804,18 +958,37 @@ impl<'a> Engine<'a> {
         self.blocks.push(BlockOut::Para(p));
     }
 
-    fn push_display_math(&mut self, src: &str) {
-        self.flush_text_paragraph();
-        let r = Run::new()
-            .fonts(
-                RunFonts::new()
-                    .ascii(self.opts.code_font.clone())
-                    .hi_ansi(self.opts.code_font.clone()),
-            )
-            .size(20)
-            .add_text(src.to_string());
-        let p = Paragraph::new().align(AlignmentType::Center).add_run(r);
-        self.blocks.push(BlockOut::Para(p));
+    /// A run for math source: italic serif (Cambria Math), no code shading, so
+    /// it reads as math rather than inline code. (docx-rs exposes no OMML
+    /// equation builder, so the LaTeX source is shown verbatim.)
+    fn math_run(&self, src: &str) -> Run {
+        let mut r = Run::new().add_text(src.to_string()).italic().fonts(
+            RunFonts::new()
+                .ascii("Cambria Math")
+                .hi_ansi("Cambria Math"),
+        );
+        if self.fmt.bold > 0 {
+            r = r.bold();
+        }
+        r
+    }
+
+    fn on_display_math(&mut self, src: &str) {
+        // If there is pending inline content (or we're inside a link/cell), the
+        // `$$` appeared mid-paragraph: render it inline to preserve flow.
+        let inline_context = !self.pending.is_empty()
+            || self.link.is_some()
+            || self.table.as_ref().is_some_and(|t| t.cur_cell.is_some());
+        if inline_context {
+            let r = self.math_run(src);
+            self.emit_run(r);
+        } else {
+            self.flush_text_paragraph();
+            let p = Paragraph::new()
+                .align(AlignmentType::Center)
+                .add_run(self.math_run(src));
+            self.blocks.push(BlockOut::Para(p));
+        }
     }
 
     fn push_footnote_ref(&mut self, label: &CowStr<'_>) {
@@ -881,7 +1054,10 @@ impl<'a> Engine<'a> {
     /// is baked into the single level's indent.
     fn alloc_numbering(&mut self, ordered: bool, level: usize, start: u64) -> usize {
         self.num_counter += 1;
-        let id = self.num_counter;
+        // docx-rs unconditionally writes a built-in numbering at abstractNumId=1
+        // / numId=1, so our ids must start at 2 to avoid a duplicate-id clash
+        // that would make Word render the first list with the wrong format.
+        let id = self.num_counter + 1;
         let indent_left = ((level as i32) + 1) * 720;
         let lvl = if ordered {
             Level::new(
@@ -933,11 +1109,13 @@ impl<'a> Engine<'a> {
 
     // ---- images ------------------------------------------------------------
 
-    /// Load image bytes from a local path or `data:` URI, validate them with the
-    /// `image` crate (so we never feed undecodable bytes to `Pic::new`, which
-    /// panics), and compute a size capped at the content width. Remote URLs are
-    /// not fetched. Returns `None` on any failure (caller falls back to alt text).
-    fn load_image(&self, img: &ImageCtx) -> Option<(Vec<u8>, u32, u32)> {
+    /// Load an image from a local path or `data:` URI and build a ready-to-embed
+    /// `Pic`, sized to fit the content box. We decode and re-encode to PNG here
+    /// (rather than via `Pic::new`, whose internal `.expect()`s panic on decode
+    /// *or* encode failure) and build the `Pic` with `new_with_dimensions`, which
+    /// does no decoding. Remote URLs are not fetched. Returns `None` on any
+    /// failure (caller falls back to alt text).
+    fn load_image(&self, img: &ImageCtx) -> Option<Pic> {
         let bytes = if let Some(rest) = img.url.strip_prefix("data:") {
             let comma = rest.find(',')?;
             let meta = &rest[..comma];
@@ -956,19 +1134,34 @@ impl<'a> Engine<'a> {
 
         let decoded = image::load_from_memory(&bytes).ok()?;
         let (w, h) = decoded.dimensions();
-        if w == 0 || h == 0 {
+        // Reject degenerate / absurd dimensions (the latter would overflow
+        // docx-rs's `from_px` = px * 9525 inside `new_with_dimensions`).
+        if w == 0 || h == 0 || w > 60_000 || h > 60_000 {
             return None;
         }
 
-        let content_emu = self.opts.page.content_width() as u64 * 635;
+        // Re-encode to PNG ourselves; bail to alt-text on encode failure.
+        let mut png = std::io::Cursor::new(Vec::new());
+        decoded.write_to(&mut png, image::ImageFormat::Png).ok()?;
+        let png_bytes = png.into_inner();
+
+        // Cap to the printable content box (1 twip = 635 EMU, 1 px = 9525 EMU).
+        let content_w = self.opts.page.content_width() as u64 * 635;
+        let content_h = self.opts.page.content_height() as u64 * 635;
         let mut w_emu = w as u64 * 9525;
         let mut h_emu = h as u64 * 9525;
-        if w_emu > content_emu {
-            let ratio = content_emu as f64 / w_emu as f64;
-            w_emu = content_emu;
+        if w_emu > content_w {
+            let ratio = content_w as f64 / w_emu as f64;
+            w_emu = content_w;
             h_emu = (h_emu as f64 * ratio).round() as u64;
         }
-        Some((bytes, w_emu as u32, h_emu as u32))
+        if h_emu > content_h {
+            let ratio = content_h as f64 / h_emu as f64;
+            h_emu = content_h;
+            w_emu = (w_emu as f64 * ratio).round() as u64;
+        }
+
+        Some(Pic::new_with_dimensions(png_bytes, w, h).size(w_emu as u32, h_emu as u32))
     }
 
     fn resolve_path(&self, url: &str) -> PathBuf {

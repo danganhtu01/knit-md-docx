@@ -33,6 +33,11 @@ impl PageSetup {
     pub fn content_width(&self) -> u32 {
         self.width.saturating_sub(self.margin.saturating_mul(2))
     }
+
+    /// Height available for content (page height minus both margins), in twips.
+    pub fn content_height(&self) -> u32 {
+        self.height.saturating_sub(self.margin.saturating_mul(2))
+    }
 }
 
 impl Default for PageSetup {

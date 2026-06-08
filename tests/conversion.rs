@@ -214,6 +214,105 @@ fn yaml_front_matter_is_not_rendered() {
 }
 
 #[test]
+fn data_uri_image_is_embedded() {
+    // A valid 1x1 PNG. Exercises base64 decode -> validate -> re-encode PNG ->
+    // Pic::new_with_dimensions (the panic-free image path).
+    let png = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC";
+    let md = format!("![dot](data:image/png;base64,{png})\n\nAfter.");
+    let bytes = to_bytes(&md).unwrap();
+
+    let mut zip = zip::ZipArchive::new(Cursor::new(bytes.clone())).unwrap();
+    let media: Vec<String> = (0..zip.len())
+        .map(|i| zip.by_index(i).unwrap().name().to_string())
+        .filter(|n| n.starts_with("word/media/"))
+        .collect();
+    assert!(!media.is_empty(), "an image part should be embedded");
+
+    let doc = read_part(&bytes, "word/document.xml");
+    assert!(doc.contains("<w:drawing"), "document references a drawing");
+    assert!(doc.contains("After"), "trailing text preserved");
+}
+
+#[test]
+fn bad_image_falls_back_to_caption_without_panicking() {
+    // Undecodable bytes must never panic; we get an alt-text caption instead.
+    let md = "![broken](data:image/png;base64,bm90YW5pbWFnZQ==)";
+    let doc = document(md);
+    assert!(
+        doc.contains("broken") || doc.contains("image:"),
+        "alt-text fallback"
+    );
+    assert!(
+        !doc.contains("<w:drawing"),
+        "no image embedded for bad bytes"
+    );
+}
+
+#[test]
+fn lists_never_use_reserved_numid_1() {
+    // docx-rs reserves abstractNumId=1 / numId=1 for a built-in default; our
+    // lists must start at 2 to avoid a duplicate-id clash that makes Word render
+    // the first list with the wrong format.
+    let bytes = to_bytes("- a\n- b").unwrap();
+    let doc = read_part(&bytes, "word/document.xml");
+    assert!(
+        !doc.contains("<w:numId w:val=\"1\""),
+        "lists must not reference the reserved numId=1"
+    );
+    assert!(
+        doc.contains("<w:numId w:val=\"2\""),
+        "first list should use numId 2"
+    );
+}
+
+#[test]
+fn bare_urls_are_autolinked() {
+    let doc = document("See https://example.com for details.");
+    assert!(doc.contains("<w:hyperlink"), "bare URL becomes a hyperlink");
+    // Surrounding text is preserved as ordinary runs.
+    assert!(doc.contains("for details"), "trailing text preserved");
+}
+
+#[test]
+fn code_block_table_has_no_black_borders() {
+    let doc = document("```\nx\n```");
+    assert!(doc.contains("<w:tbl>"), "code wrapped in a table");
+    // `Table::without_borders` emits explicit `nil`/`none` borders rather than
+    // the default single black grid.
+    assert!(
+        !doc.contains("w:val=\"single\""),
+        "code block table should not have single black borders"
+    );
+}
+
+#[test]
+fn footnote_with_a_link_does_not_emit_a_dangling_relationship() {
+    // A hyperlink inside a footnote body would allocate an r:id that
+    // footnotes.xml.rels never registers -> Word repair. We flatten it instead.
+    let md = "Text.[^a]\n\n[^a]: see [the site](https://example.com).";
+    let bytes = to_bytes(md).unwrap();
+    let notes = read_part(&bytes, "word/footnotes.xml");
+    assert!(
+        !notes.contains("<w:hyperlink"),
+        "footnote links are flattened"
+    );
+    assert!(
+        notes.contains("example.com"),
+        "the URL is still shown as text"
+    );
+}
+
+#[test]
+fn document_has_default_line_spacing() {
+    let doc = document("Hello world.");
+    assert!(
+        read_part(&to_bytes("x").unwrap(), "word/styles.xml").contains("<w:spacing"),
+        "document defaults should set paragraph spacing"
+    );
+    let _ = doc;
+}
+
+#[test]
 fn all_numbering_references_resolve() {
     let md = "- a\n  - b\n- c\n\n1. x\n2. y\n\n- [ ] t";
     let bytes = to_bytes(md).unwrap();

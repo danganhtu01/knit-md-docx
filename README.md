@@ -23,6 +23,7 @@ The output opens cleanly in Microsoft Word, LibreOffice Writer, and Google Docs
 | `[text](url)` | External hyperlinks (blue, underlined) |
 | `[text](#heading)` | Internal anchor links that jump to the heading (via bookmarks) |
 | `<https://…>`, `<a@b.com>` | Autolinks and `mailto:` email autolinks |
+| bare `https://…` in text | Linkified automatically (GFM extended autolinking) |
 | `![alt](path.png)` | Embedded, auto-sized images (scaled to fit the page width) |
 | `- item` / `1. item` | Bullet and numbered lists, with restart and custom start values |
 | nested lists | Independent numbering per level, mixed bullet/number nesting |
@@ -34,7 +35,7 @@ The output opens cleanly in Microsoft Word, LibreOffice Writer, and Google Docs
 | `---` thematic break | A centred horizontal rule |
 | `text[^1]` + `[^1]: …` | **Real Word footnotes** (auto-numbered by Word) |
 | definition lists | Bold term + indented definition |
-| `$math$`, `$$math$$` | Monospace fallback (OOXML equations are not emitted) |
+| `$math$`, `$$math$$` | Italic *Cambria Math* text (OOXML equations are not emitted) |
 | inline HTML (`<b>`, `<br>`, `<mark>`, …) | A best-effort subset mapped to runs |
 | YAML front matter | Parsed and **not** rendered into the body |
 
@@ -134,16 +135,24 @@ sizes in **half-points**, and image dimensions in **EMU** (1px = 9525 EMU).
 These are inherent to the OOXML surface that `docx-rs` exposes, and are rendered
 as documented fallbacks rather than failing:
 
-- **Math** (`$…$`, `$$…$$`) is rendered as monospace text, not as a native Word
-  equation (OMML).
-- **Remote images** (`http(s)://`) are **not** fetched; the alt text is shown
-  instead. Local paths and `data:` URIs are embedded. SVG is not supported by
-  the image decoder, so it falls back to alt text.
-- **Arbitrary HTML** is best-effort: a known subset of inline tags maps to
-  formatting; other tags are stripped (their text is kept).
-- **Superscript/subscript** Markdown extensions are not enabled (no run-level
-  vertical-alignment builder in this `docx-rs` version).
-- A footnote referenced multiple times attaches its body to the first reference.
+- **Math** (`$…$`, `$$…$$`) is rendered as italic *Cambria Math* text, not as a
+  native Word equation (OMML), which `docx-rs` cannot build.
+- **Remote images** (`http(s)://`) are **not** fetched; the alt text is shown as
+  a caption instead. Local paths and base64 `data:` URIs are embedded (decoded,
+  re-encoded to PNG, and scaled to fit the page). SVG is not supported by the
+  image decoder, so it falls back to the caption.
+- **Arbitrary HTML** is best-effort: a known subset of inline tags (`<b>`,
+  `<i>`, `<u>`, `<s>`, `<code>`, `<mark>`, `<br>`, …) maps to formatting; other
+  tags are stripped (their text is kept).
+- **Superscript/subscript** Markdown extensions are not enabled — this `docx-rs`
+  version exposes no run-level vertical-alignment builder.
+- **Thematic breaks** render as a centred rule of em dashes (paragraph borders
+  are not exposed by `docx-rs`).
+- **Footnotes inside footnotes** are not resolved (rendered as `[label]`), and
+  links inside a footnote body are flattened to text with the URL appended (a
+  real hyperlink there would dangle and trigger a Word repair).
+- A footnote referenced multiple times duplicates its body at each reference
+  rather than pointing several references at one note.
 
 ## Development
 
