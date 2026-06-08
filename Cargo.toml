@@ -1,0 +1,34 @@
+[package]
+name = "rust_knit_md_docx"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Knit Markdown (CommonMark + GitHub Flavored Markdown) into a Word .docx with high fidelity"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/danganhtu01/rust_knit_md_docx"
+readme = "README.md"
+keywords = ["markdown", "docx", "word", "commonmark", "gfm"]
+categories = ["text-processing", "command-line-utilities"]
+exclude = ["/.github", "/tests/output", "/examples/output"]
+
+[lib]
+name = "rust_knit_md_docx"
+path = "src/lib.rs"
+
+[[bin]]
+name = "knit-md-docx"
+path = "src/main.rs"
+
+[dependencies]
+docx-rs = "0.4.20"
+pulldown-cmark = { version = "0.13.4", default-features = false }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
+base64 = "0.22"
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+zip = "0.6"
+
+[profile.release]
+opt-level = 3
+lto = true

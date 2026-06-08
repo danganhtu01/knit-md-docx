@@ -1,0 +1,5 @@
+/target
+# generated sample/test output (this crate ships a binary, so Cargo.lock IS committed)
+/examples/output/
+/tests/output/
+*.docx

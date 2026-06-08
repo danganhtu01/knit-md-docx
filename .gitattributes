@@ -1,0 +1,8 @@
+# Normalise line endings: store text as LF in the repo.
+* text=auto eol=lf
+
+# Binary / generated artifacts
+*.docx binary
+*.png binary
+*.jpg binary
+*.gif binary
