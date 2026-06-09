@@ -37,7 +37,7 @@ struct Cli {
     soft_breaks: bool,
 
     /// Page size.
-    #[arg(long, value_enum, default_value_t = Page::Letter)]
+    #[arg(long, value_enum, default_value_t = Page::A4)]
     page: Page,
 
     /// Body font family.

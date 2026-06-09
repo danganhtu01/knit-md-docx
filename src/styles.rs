@@ -25,7 +25,7 @@ pub(crate) const CAPTION: &str = "Caption";
 /// Heading sizes in half-points (H1..H6): 18, 16, 14, 13, 12, 11 pt.
 const HEADING_HALF_PT: [usize; 6] = [36, 32, 28, 26, 24, 22];
 /// Word's default heading accent colour.
-const HEADING_COLOR: &str = "2F5496";
+const HEADING_COLOR: &str = "000000";
 /// Shading fill behind code blocks (GitHub-ish light grey).
 pub(crate) const CODE_FILL: &str = "F6F8FA";
 /// Shading fill behind inline code spans (kept coherent with [`CODE_FILL`]).
