@@ -11,6 +11,9 @@ pub enum Error {
     Pack(String),
     /// A Markdown input file had no readable content / wrong extension, etc.
     Input(String),
+    /// A theme/config file could not be parsed, or held an invalid value
+    /// (bad hex colour, wrong number of heading sizes, unknown page size, …).
+    Config(String),
 }
 
 impl fmt::Display for Error {
@@ -19,6 +22,7 @@ impl fmt::Display for Error {
             Error::Io(e) => write!(f, "I/O error: {e}"),
             Error::Pack(e) => write!(f, "failed to pack .docx: {e}"),
             Error::Input(e) => write!(f, "invalid input: {e}"),
+            Error::Config(e) => write!(f, "invalid config: {e}"),
         }
     }
 }

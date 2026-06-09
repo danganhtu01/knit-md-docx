@@ -85,6 +85,29 @@ pub struct ConvertOptions {
     pub code_font: String,
     /// Body font size in points (default `11.0`).
     pub body_size_pt: f32,
+    /// Code (monospace) font size in points, used by code blocks and inline
+    /// `code` runs (default `10.0`).
+    pub code_size_pt: f32,
+    /// Caption / image-alt / definition-body font size in points (default `9.0`).
+    pub caption_size_pt: f32,
+    /// Heading font sizes in points, H1..H6 (default `[18, 16, 14, 13, 12, 11]`).
+    pub heading_sizes_pt: [f32; 6],
+    /// Heading accent colour as a 6-digit hex string, no `#` (default `000000`).
+    pub heading_color: String,
+    /// Hyperlink colour as a 6-digit hex string (default `0563C1`).
+    pub link_color: String,
+    /// Caption / muted-text colour as a 6-digit hex string (default `44546A`).
+    pub caption_color: String,
+    /// Block-quote text colour as a 6-digit hex string (default `404040`).
+    pub quote_color: String,
+    /// Left indent applied to block quotes, in twips (default `720`, i.e. 0.5in).
+    pub quote_indent_twips: i32,
+    /// Shading fill behind fenced/indented code blocks (default `F6F8FA`).
+    pub code_fill: String,
+    /// Shading fill behind inline `code` spans (default `EEF1F4`).
+    pub inline_code_fill: String,
+    /// Shading fill behind table header cells (default `F2F2F2`).
+    pub header_fill: String,
     /// Page geometry.
     pub page: PageSetup,
 }
@@ -107,6 +130,17 @@ impl Default for ConvertOptions {
             heading_font: "Calibri Light".to_string(),
             code_font: "Consolas".to_string(),
             body_size_pt: 11.0,
+            code_size_pt: 10.0,
+            caption_size_pt: 9.0,
+            heading_sizes_pt: [18.0, 16.0, 14.0, 13.0, 12.0, 11.0],
+            heading_color: "000000".to_string(),
+            link_color: "0563C1".to_string(),
+            caption_color: "44546A".to_string(),
+            quote_color: "404040".to_string(),
+            quote_indent_twips: 720,
+            code_fill: "F6F8FA".to_string(),
+            inline_code_fill: "EEF1F4".to_string(),
+            header_fill: "F2F2F2".to_string(),
             page: PageSetup::default(),
         }
     }
@@ -116,6 +150,23 @@ impl ConvertOptions {
     /// Body size expressed in half-points, the unit `docx-rs` uses for run sizes.
     pub(crate) fn body_half_points(&self) -> usize {
         (self.body_size_pt * 2.0).round() as usize
+    }
+
+    /// Code (monospace) size in half-points.
+    pub(crate) fn code_half_points(&self) -> usize {
+        (self.code_size_pt * 2.0).round() as usize
+    }
+
+    /// Caption size in half-points.
+    pub(crate) fn caption_half_points(&self) -> usize {
+        (self.caption_size_pt * 2.0).round() as usize
+    }
+
+    /// Size of heading level `level` (1..=6) in half-points. Levels outside the
+    /// range clamp to the nearest valid heading.
+    pub(crate) fn heading_half_points(&self, level: usize) -> usize {
+        let i = level.clamp(1, 6) - 1;
+        (self.heading_sizes_pt[i] * 2.0).round() as usize
     }
 
     /// Translate these options into the `pulldown-cmark` parser flags.

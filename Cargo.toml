@@ -35,6 +35,10 @@ pulldown-cmark = { version = "0.13.4", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 base64 = "0.22"
 clap = { version = "4", features = ["derive"], optional = true }
+# Theme files. `src/config.rs` is a library module (`mod config;` in lib.rs), so
+# these are unconditional — they are not part of the optional `cli` surface.
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
 
 [features]
 # The library is the point; the CLI is a convenience. Consumers that embed this
