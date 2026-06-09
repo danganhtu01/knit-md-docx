@@ -54,7 +54,7 @@ cargo build --release   # binary at target/release/knit-md-docx
 
 ```toml
 [dependencies]
-knit-md-docx = { git = "https://github.com/danganhtu01/rust_knit_md_docx" }
+knit-md-docx = { git = "https://github.com/danganhtu01/knit-md-docx" }
 ```
 
 > This crate depends on a [fork of `docx-rs`](https://github.com/danganhtu01/docx-rs)
@@ -235,6 +235,11 @@ cargo run --bin knit-md-docx -- examples/sample.md   # produces examples/sample.
 ```
 
 [`examples/sample.md`](examples/sample.md) exercises every supported feature.
+
+## Credits
+
+Created by [danganhtu01](https://github.com/danganhtu01) (<admin@atdang.com>),
+co-authored with [Claude](https://claude.com/claude-code) (Anthropic's Claude Code).
 
 ## License
 
