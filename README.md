@@ -57,7 +57,7 @@ cargo build --release   # binary at target/release/knit-md-docx
 knit-md-docx = { git = "https://github.com/danganhtu01/knit-md-docx" }
 ```
 
-> This crate depends on a [fork of `docx-rs`](https://github.com/danganhtu01/docx-rs)
+> This crate depends on a [fork of `docx-rs`](https://github.com/danganhtu01/knit-md-docx-rs)
 > (for native equations, vertical-alignment runs, and paragraph borders), wired up
 > as a `path` dependency in [`Cargo.toml`](Cargo.toml). Point it at your checkout of
 > the fork, or switch it to a `git` dependency.
@@ -180,7 +180,7 @@ sizes in **half-points**, and image dimensions in **EMU** (1px = 9525 EMU).
 ## Native equations, superscript & rules — a forked `docx-rs`
 
 Three features need OOXML surface the published `docx-rs 0.4.20` does not expose,
-so this crate depends on a small [**fork**](https://github.com/danganhtu01/docx-rs)
+so this crate depends on a small [**fork**](https://github.com/danganhtu01/knit-md-docx-rs)
 (wired up via a `path`/`git` dependency) that adds:
 
 - **OMML equations** — an `OMath` / `OMathElement` tree that emits `m:oMath`
