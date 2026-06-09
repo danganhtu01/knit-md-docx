@@ -1,11 +1,11 @@
-//! `knit-md-docx` — command-line front end for the `rust_knit_md_docx` crate.
+//! `knit-md-docx` — command-line front end for the `knit_md_docx` crate.
 
 use std::io::Read;
 use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, ValueEnum};
-use rust_knit_md_docx::{ConvertOptions, PageSetup, Theme};
+use knit_md_docx::{ConvertOptions, PageSetup, Theme};
 
 /// Knit a Markdown file into a Word .docx with high fidelity.
 #[derive(Parser, Debug)]
@@ -189,6 +189,6 @@ fn run(cli: Cli) -> Result<PathBuf, Box<dyn std::error::Error>> {
         opts.soft_breaks_as_newlines = true;
     }
 
-    rust_knit_md_docx::write_file_with(&markdown, &opts, &output)?;
+    knit_md_docx::write_file_with(&markdown, &opts, &output)?;
     Ok(output)
 }

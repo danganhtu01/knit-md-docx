@@ -1,5 +1,5 @@
 [package]
-name = "rust_knit_md_docx"
+name = "knit-md-docx"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
@@ -12,7 +12,7 @@ categories = ["text-processing", "command-line-utilities"]
 exclude = ["/.github", "/tests/output", "/examples/output"]
 
 [lib]
-name = "rust_knit_md_docx"
+name = "knit_md_docx"
 path = "src/lib.rs"
 
 [[bin]]
@@ -22,8 +22,10 @@ path = "src/main.rs"
 [dependencies]
 # Forked docx-rs with native OMML (oMath) equations, run-level
 # superscript/subscript, and paragraph borders for thematic breaks.
+# The fork's package is `knit-md-docx-rs`; aliased back to `docx-rs` here so the
+# `use docx_rs::*` imports throughout the crate stay unchanged.
 # See https://github.com/danganhtu01/docx-rs
-docx-rs = { path = "../docx-rs/docx-core" }
+docx-rs = { path = "../docx-rs/docx-core", package = "knit-md-docx-rs" }
 pulldown-cmark = { version = "0.13.4", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 base64 = "0.22"
