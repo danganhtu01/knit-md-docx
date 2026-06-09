@@ -3,7 +3,7 @@
 
 use std::io::{Cursor, Read};
 
-use rust_knit_md_docx::{ConvertOptions, Converter, Theme, to_bytes, to_bytes_with};
+use knit_md_docx::{ConvertOptions, Converter, Theme, to_bytes, to_bytes_with};
 
 /// Convert Markdown and return the contents of a named part inside the `.docx`.
 fn part(markdown: &str, name: &str) -> String {
@@ -203,7 +203,7 @@ fn smart_punctuation_is_opt_in() {
 #[test]
 fn converter_with_a4_page_size() {
     let opts = ConvertOptions {
-        page: rust_knit_md_docx::PageSetup::A4,
+        page: knit_md_docx::PageSetup::A4,
         ..ConvertOptions::default()
     };
     let bytes = Converter::with_options(opts).to_bytes("# A4").unwrap();
@@ -546,7 +546,7 @@ fn theme_from_toml_overlays_only_set_fields() {
     assert_eq!(opts.heading_color, "1F3864"); // normalised: `#` stripped, upper
     assert_eq!(opts.heading_sizes_pt[0], 22.0);
     assert_eq!(opts.code_font, original_code_font, "unset fields untouched");
-    assert_eq!(opts.page, rust_knit_md_docx::PageSetup::LETTER);
+    assert_eq!(opts.page, knit_md_docx::PageSetup::LETTER);
 }
 
 #[test]

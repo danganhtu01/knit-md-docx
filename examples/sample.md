@@ -1,6 +1,6 @@
 ---
 title: Full Fidelity Sample
-author: rust_knit_md_docx
+author: knit-md-docx
 ---
 
 # Knit Markdown to DOCX

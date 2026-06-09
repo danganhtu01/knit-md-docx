@@ -1,4 +1,4 @@
-//! # rust_knit_md_docx
+//! # knit_md_docx
 //!
 //! Knit Markdown — CommonMark plus the GitHub Flavored Markdown extensions —
 //! into a Microsoft Word `.docx` file, aiming for high visual fidelity.
@@ -15,18 +15,18 @@
 //!
 //! ```no_run
 //! // Convert a file on disk, resolving relative image paths next to it.
-//! rust_knit_md_docx::convert_file("README.md", "README.docx").unwrap();
+//! knit_md_docx::convert_file("README.md", "README.docx").unwrap();
 //! ```
 //!
 //! ```
 //! // Convert a string to an in-memory `.docx` byte buffer.
-//! let bytes = rust_knit_md_docx::to_bytes("# Hello\n\nWorld **bold**.").unwrap();
+//! let bytes = knit_md_docx::to_bytes("# Hello\n\nWorld **bold**.").unwrap();
 //! assert_eq!(&bytes[..2], b"PK"); // it's a zip
 //! ```
 //!
 //! ```
 //! // Customise the conversion.
-//! use rust_knit_md_docx::{Converter, ConvertOptions, PageSetup};
+//! use knit_md_docx::{Converter, ConvertOptions, PageSetup};
 //!
 //! let mut opts = ConvertOptions::default();
 //! opts.page = PageSetup::A4;

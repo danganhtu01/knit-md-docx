@@ -1,5 +1,5 @@
 [package]
-name = "rust_knit_md_docx"
+name = "knit-md-docx"
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
@@ -12,7 +12,7 @@ categories = ["text-processing", "command-line-utilities"]
 exclude = ["/.github", "/tests/output", "/examples/output"]
 
 [lib]
-name = "rust_knit_md_docx"
+name = "knit_md_docx"
 path = "src/lib.rs"
 
 [[bin]]
@@ -29,7 +29,8 @@ required-features = ["cli"]
 #
 # Path, not registry: the fork is kept in-repo by owner decision, and the crate
 # is renamed on crates.io side anyway — the package here is `knit-md-docx-rs`,
-# so the dependency key needs an explicit `package =`.
+# so the dependency key needs an explicit `package =`. Aliased back to `docx-rs`
+# so the `use docx_rs::*` imports throughout the crate stay unchanged.
 docx-rs = { package = "knit-md-docx-rs", path = "../knit-md-docx-rs/docx-core" }
 pulldown-cmark = { version = "0.13.4", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }

@@ -474,6 +474,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "knit-md-docx"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "clap",
+ "image",
+ "knit-md-docx-rs",
+ "pulldown-cmark",
+ "serde",
+ "toml",
+ "zip 0.6.6",
+]
+
+[[package]]
 name = "knit-md-docx-rs"
 version = "0.4.20"
 dependencies = [
@@ -655,20 +669,6 @@ name = "rand_core"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
-
-[[package]]
-name = "rust_knit_md_docx"
-version = "0.1.0"
-dependencies = [
- "base64",
- "clap",
- "image",
- "knit-md-docx-rs",
- "pulldown-cmark",
- "serde",
- "toml",
- "zip 0.6.6",
-]
 
 [[package]]
 name = "serde"

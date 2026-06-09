@@ -1,4 +1,4 @@
-# rust_knit_md_docx
+# knit-md-docx
 
 > Knit Markdown into a Microsoft Word `.docx` — with high fidelity.
 
@@ -54,7 +54,7 @@ cargo build --release   # binary at target/release/knit-md-docx
 
 ```toml
 [dependencies]
-rust_knit_md_docx = { git = "https://github.com/danganhtu01/rust_knit_md_docx" }
+knit-md-docx = { git = "https://github.com/danganhtu01/rust_knit_md_docx" }
 ```
 
 > This crate depends on a [fork of `docx-rs`](https://github.com/danganhtu01/docx-rs)
@@ -132,7 +132,7 @@ soft_breaks   = false
 ## Library usage
 
 ```rust
-use rust_knit_md_docx::{convert_file, to_bytes, Converter, ConvertOptions, PageSetup};
+use knit_md_docx::{convert_file, to_bytes, Converter, ConvertOptions, PageSetup};
 
 // 1. File in, file out (relative image paths resolve next to the input).
 convert_file("README.md", "README.docx")?;
@@ -152,7 +152,7 @@ converter.write_file("# Title\n\nBody.", "out.docx")?;
 // Get a `Docx` you can keep customising before packing it yourself:
 let docx = converter.to_docx("# Title");
 docx.build().pack(std::fs::File::create("custom.docx")?)?;
-# Ok::<(), rust_knit_md_docx::Error>(())
+# Ok::<(), knit_md_docx::Error>(())
 ```
 
 ## How it works

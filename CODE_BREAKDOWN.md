@@ -1,9 +1,9 @@
-# Code Breakdown — `rust_knit_md_docx` and its `docx-rs` fork
+# Code Breakdown — `knit-md-docx` and its `docx-rs` fork
 
 A plain-language tour of every Rust file across both projects, written for a
 non-coder. It explains what each file is for and what each function does.
 
-- **`rust_knit_md_docx`** — your crate (the program you run): reads Markdown,
+- **`knit-md-docx`** — your crate (the program you run): reads Markdown,
   writes a Word `.docx`.
 - **`docx-rs`** (fork: <https://github.com/danganhtu01/docx-rs>) — the library
   that physically builds the `.docx`.
@@ -14,7 +14,7 @@ non-coder. It explains what each file is for and what each function does.
 
 You have **two projects** that work together:
 
-1. **`rust_knit_md_docx`** (your crate) — the thing you actually run. It reads a
+1. **`knit-md-docx`** (your crate) — the thing you actually run. It reads a
    Markdown file and produces a Word `.docx`. Think of it as a **translator +
    typesetter**: it understands the author's shorthand (Markdown) and lays out a
    properly formatted Word document.
@@ -42,7 +42,7 @@ docx-rs (the fork)  ──builds──▶  the XML  ──zips──▶  output.
 
 ---
 
-## Part 2 — Your crate, `rust_knit_md_docx` (8 files)
+## Part 2 — Your crate, `knit-md-docx` (8 files)
 
 ### `lib.rs` — the front desk
 
