@@ -490,6 +490,8 @@ dependencies = [
 [[package]]
 name = "knit-md-docx-rs"
 version = "0.4.20"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d583b95a1313e437f17d8f403ed0d88128639b0ead678e54996f7a2a976d8679"
 dependencies = [
  "base64",
  "image",

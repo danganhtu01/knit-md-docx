@@ -25,7 +25,7 @@ path = "src/main.rs"
 # The fork's package is `knit-md-docx-rs`; aliased back to `docx-rs` here so the
 # `use docx_rs::*` imports throughout the crate stay unchanged.
 # See https://github.com/danganhtu01/knit-md-docx-rs
-docx-rs = { path = "../knit-md-docx-rs/docx-core", package = "knit-md-docx-rs" }
+docx-rs = { version = "0.4.20", package = "knit-md-docx-rs" }
 pulldown-cmark = { version = "0.13.4", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 base64 = "0.22"
