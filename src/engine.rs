@@ -29,6 +29,9 @@ use crate::styles;
 enum Inline {
     Run(Run),
     Link(Box<Hyperlink>),
+    /// A native Word equation (`m:oMath`). Like a hyperlink it is a paragraph
+    /// child rather than a run, so it cannot live in the run list.
+    Math(Box<OMath>),
 }
 
 /// A finished block destined for the document body.
@@ -48,6 +51,8 @@ struct InlineFmt {
     underline: u32,
     highlight: u32,
     code: u32,
+    superscript: u32,
+    subscript: u32,
 }
 
 /// One frame per open Markdown list.
@@ -298,10 +303,7 @@ impl<'a> Engine<'a> {
                 let r = self.styled_run(&t, true);
                 self.emit_run(r);
             }
-            Event::InlineMath(t) => {
-                let r = self.math_run(&t);
-                self.emit_run(r);
-            }
+            Event::InlineMath(t) => self.on_inline_math(&t),
             Event::DisplayMath(t) => self.on_display_math(&t),
             Event::Html(s) => self.on_html_block(&s),
             Event::InlineHtml(s) => self.on_inline_html(&s),
@@ -393,8 +395,8 @@ impl<'a> Engine<'a> {
             Tag::Emphasis => self.fmt.italic += 1,
             Tag::Strong => self.fmt.bold += 1,
             Tag::Strikethrough => self.fmt.strike += 1,
-            // Superscript/Subscript extensions are not enabled; render inline.
-            Tag::Superscript | Tag::Subscript => {}
+            Tag::Superscript => self.fmt.superscript += 1,
+            Tag::Subscript => self.fmt.subscript += 1,
             Tag::Link { dest_url, .. } => {
                 let s = dest_url.to_string();
                 let (anchor, target) = if let Some(rest) = s.strip_prefix('#') {
@@ -459,7 +461,8 @@ impl<'a> Engine<'a> {
             TagEnd::Emphasis => self.fmt.italic = self.fmt.italic.saturating_sub(1),
             TagEnd::Strong => self.fmt.bold = self.fmt.bold.saturating_sub(1),
             TagEnd::Strikethrough => self.fmt.strike = self.fmt.strike.saturating_sub(1),
-            TagEnd::Superscript | TagEnd::Subscript => {}
+            TagEnd::Superscript => self.fmt.superscript = self.fmt.superscript.saturating_sub(1),
+            TagEnd::Subscript => self.fmt.subscript = self.fmt.subscript.saturating_sub(1),
             TagEnd::Link => self.flush_link(),
             TagEnd::Image => self.flush_image(),
             TagEnd::HtmlBlock => {}
@@ -488,7 +491,67 @@ impl<'a> Engine<'a> {
         if self.heading.is_some() {
             self.heading_text.push_str(t);
         }
+        self.emit_text(t);
+    }
+
+    /// Emit body text. Autolinking is the *outer* pass: bare URLs are located
+    /// over the whole string and emitted whole, and only the URL-free gaps are
+    /// handed to the intraword `^superscript^` / `~subscript~` scanner. (Doing it
+    /// the other way round let a `^x^` / `~x~` inside a URL split the link.)
+    fn emit_text(&mut self, t: &str) {
         self.emit_autolinked(t);
+    }
+
+    /// Peel off intraword `^superscript^` and `~subscript~` spans (which
+    /// pulldown-cmark only recognises at word boundaries) from a slice that is
+    /// already known to be URL-free, emitting the remainder as plain runs.
+    fn emit_scripts(&mut self, t: &str) {
+        if !self.opts.super_sub {
+            let r = self.styled_run(t, false);
+            self.emit_run(r);
+            return;
+        }
+        let bytes = t.as_bytes();
+        let mut i = 0;
+        let mut seg_start = 0;
+        while i < t.len() {
+            let b = bytes[i];
+            if (b == b'^' || b == b'~') && i + 1 < t.len() {
+                if let Some(end) = script_span(t, i, b) {
+                    if seg_start < i {
+                        let r = self.styled_run(&t[seg_start..i], false);
+                        self.emit_run(r);
+                    }
+                    let inner = &t[i + 1..end];
+                    self.emit_script(inner, b == b'^');
+                    i = end + 1;
+                    seg_start = i;
+                    continue;
+                }
+            }
+            i += 1;
+        }
+        if seg_start < t.len() {
+            let r = self.styled_run(&t[seg_start..], false);
+            self.emit_run(r);
+        }
+    }
+
+    /// Emit one run of script (super/sub) text with the matching vertical
+    /// alignment applied for the duration of the run.
+    fn emit_script(&mut self, inner: &str, superscript: bool) {
+        if superscript {
+            self.fmt.superscript += 1;
+        } else {
+            self.fmt.subscript += 1;
+        }
+        let r = self.styled_run(inner, false);
+        self.emit_run(r);
+        if superscript {
+            self.fmt.superscript -= 1;
+        } else {
+            self.fmt.subscript -= 1;
+        }
     }
 
     /// Emit text, turning bare `http(s)://` URLs into hyperlinks (GFM extended
@@ -496,8 +559,9 @@ impl<'a> Engine<'a> {
     /// explicit link and in footnote bodies (where links are flattened).
     fn emit_autolinked(&mut self, t: &str) {
         if self.link.is_some() || self.flatten_links {
-            let r = self.styled_run(t, false);
-            self.emit_run(r);
+            // Inside an explicit link / footnote body: no autolinking, but still
+            // honour intraword scripts.
+            self.emit_scripts(t);
             return;
         }
         let mut last = 0;
@@ -534,8 +598,7 @@ impl<'a> Engine<'a> {
                 let scheme_len = if rest.starts_with("https://") { 8 } else { 7 };
                 if e > s + scheme_len {
                     if last < s {
-                        let r = self.styled_run(&t[last..s], false);
-                        self.emit_run(r);
+                        self.emit_scripts(&t[last..s]);
                     }
                     let url = t[s..e].to_string();
                     let run = self.styled_run(&url, false).style(styles::HYPERLINK);
@@ -549,8 +612,7 @@ impl<'a> Engine<'a> {
             search = s + 4;
         }
         if last < t.len() {
-            let r = self.styled_run(&t[last..], false);
-            self.emit_run(r);
+            self.emit_scripts(&t[last..]);
         }
     }
 
@@ -586,6 +648,12 @@ impl<'a> Engine<'a> {
         }
         if self.fmt.highlight > 0 {
             r = r.highlight("yellow");
+        }
+        // Vertical alignment is mutually exclusive; an outer superscript wins.
+        if self.fmt.superscript > 0 {
+            r = r.superscript();
+        } else if self.fmt.subscript > 0 {
+            r = r.subscript();
         }
         if self.table.as_ref().is_some_and(|t| t.in_head) {
             r = r.bold();
@@ -650,6 +718,7 @@ impl<'a> Engine<'a> {
             p = match inl {
                 Inline::Run(r) => p.add_run(r),
                 Inline::Link(h) => p.add_hyperlink(*h),
+                Inline::Math(m) => p.add_omath(*m),
             };
         }
         p = self.decorate(p);
@@ -726,6 +795,7 @@ impl<'a> Engine<'a> {
             p = match inl {
                 Inline::Run(r) => p.add_run(r),
                 Inline::Link(h) => p.add_hyperlink(*h),
+                Inline::Math(m) => p.add_omath(*m),
             };
         }
         if let Some(id) = bid {
@@ -865,6 +935,7 @@ impl<'a> Engine<'a> {
             p = match inl {
                 Inline::Run(r) => p.add_run(r),
                 Inline::Link(h) => p.add_hyperlink(*h),
+                Inline::Math(m) => p.add_omath(*m),
             };
         }
         p = match align {
@@ -928,6 +999,7 @@ impl<'a> Engine<'a> {
             p = match inl {
                 Inline::Run(r) => p.add_run(r),
                 Inline::Link(h) => p.add_hyperlink(*h),
+                Inline::Math(m) => p.add_omath(*m),
             };
         }
         p = match kind {
@@ -952,15 +1024,27 @@ impl<'a> Engine<'a> {
         self.blocks.push(BlockOut::Para(p));
     }
 
+    /// A thematic break: an empty paragraph carrying a single bottom border,
+    /// which Word renders as a horizontal rule spanning the content width. The
+    /// rule inherits any list/quote indent so it aligns with its container.
     fn push_hr(&mut self) {
-        let r = Run::new().add_text("\u{2014}".repeat(40)).color("BFBFBF");
-        let p = Paragraph::new().align(AlignmentType::Center).add_run(r);
+        let border = ParagraphBorder::new(ParagraphBorderPosition::Bottom)
+            .val(BorderType::Single)
+            .size(6) // eighths of a point → 0.75pt
+            .space(1)
+            .color("999999");
+        let borders = ParagraphBorders::with_empty().set(border);
+        let mut p = Paragraph::new().set_borders(borders);
+        let indent = self.list_indent().saturating_add(self.quote_indent());
+        if indent > 0 {
+            p = p.indent(Some(indent), None, None, None);
+        }
         self.blocks.push(BlockOut::Para(p));
     }
 
-    /// A run for math source: italic serif (Cambria Math), no code shading, so
-    /// it reads as math rather than inline code. (docx-rs exposes no OMML
-    /// equation builder, so the LaTeX source is shown verbatim.)
+    /// A run for math source rendered as text (the fallback when native OMML is
+    /// disabled, or inside a hyperlink where a `m:oMath` child cannot live):
+    /// italic serif (Cambria Math), no code shading, so it reads as math.
     fn math_run(&self, src: &str) -> Run {
         let mut r = Run::new().add_text(src.to_string()).italic().fonts(
             RunFonts::new()
@@ -973,20 +1057,59 @@ impl<'a> Engine<'a> {
         r
     }
 
+    /// Inline `$…$` math: a native `m:oMath` equation routed into the current
+    /// paragraph/cell. Falls back to a text run when native math is disabled or
+    /// when inside a hyperlink (which holds runs, not paragraph children).
+    fn on_inline_math(&mut self, src: &str) {
+        if !self.opts.native_math || self.link.is_some() {
+            let r = self.math_run(src);
+            self.emit_run(r);
+            return;
+        }
+        let math = crate::math::latex_to_omath(src, false);
+        self.target_buf().push(Inline::Math(Box::new(math)));
+    }
+
     fn on_display_math(&mut self, src: &str) {
         // If there is pending inline content (or we're inside a link/cell), the
         // `$$` appeared mid-paragraph: render it inline to preserve flow.
         let inline_context = !self.pending.is_empty()
             || self.link.is_some()
             || self.table.as_ref().is_some_and(|t| t.cur_cell.is_some());
+
+        if !self.opts.native_math {
+            if inline_context {
+                let r = self.math_run(src);
+                self.emit_run(r);
+            } else {
+                self.flush_text_paragraph();
+                let p = Paragraph::new()
+                    .align(AlignmentType::Center)
+                    .add_run(self.math_run(src));
+                // Inherit list/quote styling + indent of the containing block.
+                let p = self.decorate(p);
+                self.blocks.push(BlockOut::Para(p));
+            }
+            return;
+        }
+
         if inline_context {
-            let r = self.math_run(src);
-            self.emit_run(r);
+            // Mid-paragraph `$$`: keep it inline (no block break), but inside a
+            // hyperlink fall back to text since `m:oMath` is not a run.
+            if self.link.is_some() {
+                let r = self.math_run(src);
+                self.emit_run(r);
+            } else {
+                let math = crate::math::latex_to_omath(src, false);
+                self.target_buf().push(Inline::Math(Box::new(math)));
+            }
         } else {
             self.flush_text_paragraph();
-            let p = Paragraph::new()
-                .align(AlignmentType::Center)
-                .add_run(self.math_run(src));
+            // A display equation: `m:oMathPara` (self-centring) in its own
+            // paragraph, inheriting any block-quote/list styling and indent.
+            let math = crate::math::latex_to_omath(src, true);
+            let p = Paragraph::new().add_omath(math);
+            let p = self.decorate(p);
             self.blocks.push(BlockOut::Para(p));
         }
     }
@@ -1042,6 +1165,10 @@ impl<'a> Engine<'a> {
             "</code>" | "</kbd>" | "</tt>" => self.fmt.code = self.fmt.code.saturating_sub(1),
             "<mark>" => self.fmt.highlight += 1,
             "</mark>" => self.fmt.highlight = self.fmt.highlight.saturating_sub(1),
+            "<sup>" => self.fmt.superscript += 1,
+            "</sup>" => self.fmt.superscript = self.fmt.superscript.saturating_sub(1),
+            "<sub>" => self.fmt.subscript += 1,
+            "</sub>" => self.fmt.subscript = self.fmt.subscript.saturating_sub(1),
             _ => {}
         }
     }
@@ -1182,6 +1309,32 @@ impl<'a> Engine<'a> {
 fn checkbox_run(checked: bool) -> Run {
     let glyph = if checked { "\u{2612} " } else { "\u{2610} " };
     Run::new().add_text(glyph)
+}
+
+/// If a `^…^` / `~…~` script span opens at `open` (delimiter byte `delim`),
+/// return the byte index of its closing delimiter. A span is valid only when it
+/// is a *single* delimiter (not `^^`/`~~`), has non-empty content, and contains
+/// no whitespace — mirroring the intraword, paired-delimiter convention. The
+/// returned index is a valid char boundary because the delimiters are ASCII.
+fn script_span(t: &str, open: usize, delim: u8) -> Option<usize> {
+    let bytes = t.as_bytes();
+    // `~~` is strikethrough (and `^^` is meaningless); never a script.
+    if bytes.get(open + 1) == Some(&delim) {
+        return None;
+    }
+    let delim_ch = delim as char;
+    for (off, ch) in t[open + 1..].char_indices() {
+        let j = open + 1 + off;
+        if ch == delim_ch {
+            return if j > open + 1 { Some(j) } else { None };
+        }
+        // Any whitespace — including Unicode spaces such as U+00A0/U+2009 —
+        // terminates the candidate span.
+        if ch.is_whitespace() {
+            return None;
+        }
+    }
+    None
 }
 
 fn bullet_glyph(level: usize) -> &'static str {

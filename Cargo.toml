@@ -20,7 +20,10 @@ name = "knit-md-docx"
 path = "src/main.rs"
 
 [dependencies]
-docx-rs = "0.4.20"
+# Forked docx-rs with native OMML (oMath) equations, run-level
+# superscript/subscript, and paragraph borders for thematic breaks.
+# See https://github.com/danganhtu01/docx-rs
+docx-rs = { path = "../docx-rs/docx-core" }
 pulldown-cmark = { version = "0.13.4", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 base64 = "0.22"

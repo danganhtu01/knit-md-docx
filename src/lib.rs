@@ -37,6 +37,7 @@
 
 mod engine;
 mod error;
+mod math;
 mod options;
 mod styles;
 

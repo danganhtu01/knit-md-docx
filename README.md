@@ -32,10 +32,11 @@ The output opens cleanly in Microsoft Word, LibreOffice Writer, and Google Docs
 | `> quote` | `Quote` paragraph style; nested quotes indent further |
 | `> [!NOTE]` GFM alerts | A coloured **Note / Tip / Important / Warning / Caution** label |
 | GFM tables | Bordered tables with a shaded header row and per-column alignment |
-| `---` thematic break | A centred horizontal rule |
+| `---` thematic break | A horizontal rule (an empty paragraph with a bottom border) |
 | `text[^1]` + `[^1]: …` | **Real Word footnotes** (auto-numbered by Word) |
 | definition lists | Bold term + indented definition |
-| `$math$`, `$$math$$` | Italic *Cambria Math* text (OOXML equations are not emitted) |
+| `$math$`, `$$math$$` | **Native Word equations** (OMML / `m:oMath`) via a LaTeX-subset translator |
+| `^sup^`, `~sub~`, `<sup>`, `<sub>` | Real superscript / subscript runs (`w:vertAlign`) |
 | inline HTML (`<b>`, `<br>`, `<mark>`, …) | A best-effort subset mapped to runs |
 | YAML front matter | Parsed and **not** rendered into the body |
 
@@ -55,6 +56,11 @@ cargo build --release   # binary at target/release/knit-md-docx
 [dependencies]
 rust_knit_md_docx = { git = "https://github.com/danganhtu01/rust_knit_md_docx" }
 ```
+
+> This crate depends on a [fork of `docx-rs`](https://github.com/danganhtu01/docx-rs)
+> (for native equations, vertical-alignment runs, and paragraph borders), wired up
+> as a `path` dependency in [`Cargo.toml`](Cargo.toml). Point it at your checkout of
+> the fork, or switch it to a `git` dependency.
 
 ## Command-line usage
 
@@ -130,24 +136,49 @@ the reference site).
 Units, for reference: page geometry and indents are in **twips** (1/1440″), run
 sizes in **half-points**, and image dimensions in **EMU** (1px = 9525 EMU).
 
+## Native equations, superscript & rules — a forked `docx-rs`
+
+Three features need OOXML surface the published `docx-rs 0.4.20` does not expose,
+so this crate depends on a small [**fork**](https://github.com/danganhtu01/docx-rs)
+(wired up via a `path`/`git` dependency) that adds:
+
+- **OMML equations** — an `OMath` / `OMathElement` tree that emits `m:oMath`
+  (runs, super/subscripts, fractions, radicals, n-ary operators, delimiters,
+  functions) plus the `xmlns:m` namespace on `w:document`.
+- **`Run::superscript()` / `Run::subscript()`** — run-level `w:vertAlign`.
+- **`Paragraph::set_borders()`** — paragraph borders (used for the rule).
+
+[`src/math.rs`](src/math.rs) translates a useful subset of LaTeX math into that
+`OMath` tree, so `$x^2$` and `$$\frac{a}{b}$$` become **real, editable Word
+equations** rather than styled text. Unrecognised LaTeX degrades to literal text,
+so nothing is ever lost.
+
 ## Known limitations
 
-These are inherent to the OOXML surface that `docx-rs` exposes, and are rendered
-as documented fallbacks rather than failing:
+These are rendered as documented fallbacks rather than failing:
 
-- **Math** (`$…$`, `$$…$$`) is rendered as italic *Cambria Math* text, not as a
-  native Word equation (OMML), which `docx-rs` cannot build.
+- **Math** translates a *subset* of LaTeX (super/subscripts, `\frac`, `\sqrt`,
+  `\sum`/`\int` with limits, `\left(…\right)`, Greek + a broad symbol table).
+  Unsupported constructs (matrices, `\begin{…}` environments, accents like
+  `\hat`) fall back to literal text inside the equation. Math inside a hyperlink
+  is rendered as text (an `m:oMath` cannot be a hyperlink child). Deeply nested
+  input is depth-capped (the remainder becomes literal text) so adversarial
+  Markdown cannot overflow the stack. Set `native_math: false` to revert to the
+  old italic *Cambria Math* text.
+- **Equations are write-only.** The fork emits `m:oMath`/`m:oMathPara`, but the
+  `docx-rs` reader does not parse them, so reading a `.docx` and writing it back
+  out with `docx-rs` drops any equations. This converter only writes, so it is
+  unaffected; it matters only if you round-trip through the reader.
+- **Superscript/subscript** use `^sup^` / `~sub~` (paired, intraword delimiters)
+  and `<sup>`/`<sub>`. Because `~` now denotes subscript, a single literal `~`
+  forming a pair (e.g. `a~b~c`) becomes subscript; disable with `super_sub: false`.
 - **Remote images** (`http(s)://`) are **not** fetched; the alt text is shown as
   a caption instead. Local paths and base64 `data:` URIs are embedded (decoded,
   re-encoded to PNG, and scaled to fit the page). SVG is not supported by the
   image decoder, so it falls back to the caption.
 - **Arbitrary HTML** is best-effort: a known subset of inline tags (`<b>`,
-  `<i>`, `<u>`, `<s>`, `<code>`, `<mark>`, `<br>`, …) maps to formatting; other
-  tags are stripped (their text is kept).
-- **Superscript/subscript** Markdown extensions are not enabled — this `docx-rs`
-  version exposes no run-level vertical-alignment builder.
-- **Thematic breaks** render as a centred rule of em dashes (paragraph borders
-  are not exposed by `docx-rs`).
+  `<i>`, `<u>`, `<s>`, `<code>`, `<mark>`, `<br>`, `<sup>`, `<sub>`, …) maps to
+  formatting; other tags are stripped (their text is kept).
 - **Footnotes inside footnotes** are not resolved (rendered as `[label]`), and
   links inside a footnote body are flattened to text with the URL appended (a
   real hyperlink there would dangle and trigger a Word repair).
@@ -158,7 +189,7 @@ as documented fallbacks rather than failing:
 
 ```sh
 cargo build
-cargo test          # 20 integration tests + doc-tests
+cargo test          # 36 integration + 12 unit (math) + 3 doc-tests
 cargo run --bin knit-md-docx -- examples/sample.md   # produces examples/sample.docx
 ```
 

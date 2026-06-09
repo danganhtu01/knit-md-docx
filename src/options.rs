@@ -54,9 +54,14 @@ pub struct ConvertOptions {
     pub gfm: bool,
     /// Turn straight quotes/dashes into typographic ones (`--` -> en dash, etc.).
     pub smart_punctuation: bool,
-    /// Recognise `$inline$` and `$$display$$` math (rendered as monospace; Word
-    /// has no equation builder exposed by `docx-rs`).
+    /// Recognise `$inline$` and `$$display$$` math.
     pub math: bool,
+    /// Render math as native Word equations (OMML / `m:oMath`) by translating a
+    /// LaTeX subset, instead of as italic *Cambria Math* text. Requires [`math`].
+    pub native_math: bool,
+    /// Enable the `^superscript^` / `~subscript~` inline extensions (and map
+    /// `<sup>` / `<sub>` HTML) to real Word vertical-alignment runs.
+    pub super_sub: bool,
     /// Recognise `Term\n: definition` definition lists.
     pub definition_lists: bool,
     /// Honour `{#custom-id}` attributes on headings (used for anchor links).
@@ -90,6 +95,8 @@ impl Default for ConvertOptions {
             gfm: true,
             smart_punctuation: false,
             math: true,
+            native_math: true,
+            super_sub: true,
             definition_lists: true,
             heading_attributes: true,
             yaml_front_matter: true,
@@ -127,6 +134,10 @@ impl ConvertOptions {
         }
         if self.math {
             o.insert(CmarkOptions::ENABLE_MATH);
+        }
+        if self.super_sub {
+            o.insert(CmarkOptions::ENABLE_SUPERSCRIPT);
+            o.insert(CmarkOptions::ENABLE_SUBSCRIPT);
         }
         if self.definition_lists {
             o.insert(CmarkOptions::ENABLE_DEFINITION_LIST);

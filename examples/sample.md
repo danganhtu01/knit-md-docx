@@ -14,7 +14,7 @@ line that should join with a space.
 
 A [normal external link](https://example.com), an autolink <https://rust-lang.org>,
 an email autolink <hello@example.com>, and an [internal link](#lists) to a later
-heading. Inline math like $E = mc^2$ stays monospace.
+heading. Inline math like $E = mc^2$ becomes a native Word equation.
 
 Hard break below:
 first line\
@@ -114,11 +114,33 @@ Below the line.
 ## HTML
 
 Some <b>bold via HTML</b> and a <mark>highlighted</mark> span, plus a hard<br>break.
+Vertical alignment: x<sup>2</sup> and a<sub>n</sub> via HTML tags.
 
-## Math block
+## Superscript & subscript
+
+Markdown shorthand: water is H~2~O, carbon dioxide is CO~2~, and the 1^st^ and
+2^nd^ items are ordinals. Glucose is C~6~H~12~O~6~.
+
+## Math
+
+Inline: the quadratic formula $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$, a sum
+$\sum_{i=1}^{n} i = \frac{n(n+1)}{2}$, and a set relation
+$\forall \varepsilon > 0, \exists \delta > 0$.
+
+Greek and operators: $\alpha\beta\gamma$, $\theta \leq \pi$, $a \cdot b \neq 0$.
+
+Display equations:
 
 $$
 \int_0^\infty e^{-x}\,dx = 1
+$$
+
+$$
+e^{i\pi} + 1 = 0
+$$
+
+$$
+\left( \sum_{k=1}^{n} a_k \right)^2 \leq n \sum_{k=1}^{n} a_k^2
 $$
 
 The end.

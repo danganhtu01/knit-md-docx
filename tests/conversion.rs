@@ -165,10 +165,19 @@ fn footnotes_resolve_to_real_word_notes() {
 }
 
 #[test]
-fn thematic_break_renders_centered_rule() {
+fn thematic_break_renders_as_a_paragraph_border() {
     let doc = document("a\n\n---\n\nb");
-    assert!(doc.contains("w:val=\"center\""), "rule is centered");
-    assert!(doc.contains('\u{2014}'), "rule uses em dashes");
+    // A real Word horizontal rule is an empty paragraph carrying a bottom
+    // border (`<w:pBdr>` with `<w:bottom>`), not a row of em dashes.
+    assert!(
+        doc.contains("<w:pBdr>"),
+        "thematic break uses paragraph borders"
+    );
+    assert!(doc.contains("<w:bottom"), "bottom border present");
+    assert!(
+        !doc.contains(&"\u{2014}".repeat(40)),
+        "no em-dash fallback rule"
+    );
 }
 
 #[test]
@@ -333,3 +342,139 @@ fn all_numbering_references_resolve() {
         );
     }
 }
+
+#[test]
+fn inline_math_renders_as_native_omml() {
+    let doc = document("The identity $x^2 + y^2 = z^2$ holds.");
+    assert!(doc.contains("<m:oMath"), "native OMML equation emitted");
+    assert!(doc.contains("<m:sSup>"), "superscript structure built");
+    // Surrounding prose is preserved in the same paragraph.
+    assert!(doc.contains("holds"), "trailing text kept");
+    assert!(!doc.contains("oMathPara"), "inline math is not a display block");
+}
+
+#[test]
+fn display_math_is_a_centered_block_equation() {
+    let doc = document("Before.\n\n$$\\frac{a}{b}$$\n\nAfter.");
+    assert!(doc.contains("<m:oMathPara"), "display math wraps in oMathPara");
+    assert!(doc.contains("<m:f>"), "fraction structure");
+    assert!(doc.contains("<m:num>") && doc.contains("<m:den>"), "num/den");
+}
+
+#[test]
+fn math_namespace_is_declared() {
+    // Without xmlns:m on the document element, Word rejects m: elements.
+    let doc = document("$a+b$");
+    assert!(
+        doc.contains("xmlns:m=\"http://schemas.openxmlformats.org/officeDocument/2006/math\""),
+        "math namespace declared on w:document"
+    );
+}
+
+#[test]
+fn sum_with_limits_builds_an_nary() {
+    let doc = document("$$\\sum_{i=1}^{n} i$$");
+    assert!(doc.contains("<m:nary>"), "n-ary operator");
+    assert!(doc.contains('\u{2211}'), "sum glyph present");
+    assert!(doc.contains("<m:sub>") && doc.contains("<m:sup>"), "limits");
+}
+
+#[test]
+fn greek_and_relations_map_to_unicode() {
+    let doc = document("$\\alpha \\leq \\beta$");
+    assert!(doc.contains('\u{03B1}'), "alpha");
+    assert!(doc.contains('\u{2264}'), "less-than-or-equal");
+    assert!(doc.contains('\u{03B2}'), "beta");
+}
+
+#[test]
+fn superscript_extension_sets_vertical_alignment() {
+    let doc = document("E = mc^2^ and water is H~2~O.");
+    assert!(
+        doc.contains("w:val=\"superscript\""),
+        "^x^ becomes a superscript run"
+    );
+    assert!(
+        doc.contains("w:val=\"subscript\""),
+        "~x~ becomes a subscript run"
+    );
+}
+
+#[test]
+fn html_sup_sub_tags_set_vertical_alignment() {
+    let doc = document("x<sup>2</sup> and a<sub>n</sub>");
+    assert!(doc.contains("w:val=\"superscript\""), "<sup> superscript");
+    assert!(doc.contains("w:val=\"subscript\""), "<sub> subscript");
+}
+
+#[test]
+fn math_inside_a_link_falls_back_to_text() {
+    // OMML cannot live inside a hyperlink (which holds runs), so it must not
+    // emit a dangling m:oMath there; the source renders as italic text instead.
+    let doc = document("See [$x^2$](https://example.com).");
+    assert!(doc.contains("<w:hyperlink"), "link still renders");
+    // The link text run must not contain an oMath child.
+    assert!(
+        !doc.contains("<m:oMath"),
+        "no native equation inside the hyperlink"
+    );
+}
+
+#[test]
+fn native_math_can_be_disabled() {
+    let opts = ConvertOptions {
+        native_math: false,
+        ..ConvertOptions::default()
+    };
+    let bytes = to_bytes_with("$x^2$", &opts).unwrap();
+    let doc = read_part(&bytes, "word/document.xml");
+    assert!(!doc.contains("<m:oMath"), "no OMML when native math is off");
+    assert!(doc.contains("Cambria Math"), "falls back to Cambria Math text");
+}
+
+#[test]
+fn math_metacharacters_are_xml_escaped() {
+    // `<`, `>`, `&` inside math must be escaped or the document is malformed
+    // and Word refuses to open it without repair.
+    let doc = document("Compare $a < b$ and $c & d$.");
+    assert!(doc.contains("&lt;"), "less-than escaped");
+    assert!(doc.contains("&amp;"), "ampersand escaped");
+    assert!(!doc.contains("<m:t xml:space=\"preserve\">a < b"), "no raw <");
+}
+
+#[test]
+fn bare_url_with_caret_is_not_shredded_by_script_scanner() {
+    // The intraword ^/~ scanner must not split a URL: autolinking runs first.
+    let doc = document("see http://a.com/x^2^y end");
+    // The full URL survives as one hyperlink target (not truncated at `x`).
+    assert!(
+        doc.contains("http://a.com/x^2^y") || doc.contains("http://a.com/x%5E2%5Ey"),
+        "the whole URL is linked, not truncated: {}",
+        &doc[..doc.len().min(4000)]
+    );
+    // And no spurious superscript run was carved out of the URL.
+    assert!(
+        !doc.contains("w:val=\"superscript\""),
+        "no superscript carved from inside the URL"
+    );
+}
+
+#[test]
+fn display_math_in_a_block_quote_keeps_the_quote_style() {
+    let doc = document("> text\n>\n> $$x^2$$");
+    assert!(doc.contains("<m:oMathPara"), "native display equation");
+    // The equation paragraph must inherit the Quote style of its container.
+    assert!(
+        doc.matches("w:val=\"Quote\"").count() >= 2,
+        "both the text and the equation paragraph carry the Quote style"
+    );
+}
+
+#[test]
+fn deeply_nested_math_does_not_crash_the_converter() {
+    // Adversarial input must not overflow the stack / abort the process.
+    let src = format!("${}x{}$", "{".repeat(40_000), "}".repeat(40_000));
+    let bytes = to_bytes(&src).expect("conversion must not panic");
+    assert_eq!(&bytes[..2], b"PK");
+}
+
