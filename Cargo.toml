@@ -28,6 +28,8 @@ pulldown-cmark = { version = "0.13.4", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 base64 = "0.22"
 clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
 
 [dev-dependencies]
 zip = "0.6"

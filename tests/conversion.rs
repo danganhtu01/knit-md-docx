@@ -3,7 +3,7 @@
 
 use std::io::{Cursor, Read};
 
-use rust_knit_md_docx::{ConvertOptions, Converter, to_bytes, to_bytes_with};
+use rust_knit_md_docx::{ConvertOptions, Converter, Theme, to_bytes, to_bytes_with};
 
 /// Convert Markdown and return the contents of a named part inside the `.docx`.
 fn part(markdown: &str, name: &str) -> String {
@@ -350,15 +350,24 @@ fn inline_math_renders_as_native_omml() {
     assert!(doc.contains("<m:sSup>"), "superscript structure built");
     // Surrounding prose is preserved in the same paragraph.
     assert!(doc.contains("holds"), "trailing text kept");
-    assert!(!doc.contains("oMathPara"), "inline math is not a display block");
+    assert!(
+        !doc.contains("oMathPara"),
+        "inline math is not a display block"
+    );
 }
 
 #[test]
 fn display_math_is_a_centered_block_equation() {
     let doc = document("Before.\n\n$$\\frac{a}{b}$$\n\nAfter.");
-    assert!(doc.contains("<m:oMathPara"), "display math wraps in oMathPara");
+    assert!(
+        doc.contains("<m:oMathPara"),
+        "display math wraps in oMathPara"
+    );
     assert!(doc.contains("<m:f>"), "fraction structure");
-    assert!(doc.contains("<m:num>") && doc.contains("<m:den>"), "num/den");
+    assert!(
+        doc.contains("<m:num>") && doc.contains("<m:den>"),
+        "num/den"
+    );
 }
 
 #[test]
@@ -429,7 +438,10 @@ fn native_math_can_be_disabled() {
     let bytes = to_bytes_with("$x^2$", &opts).unwrap();
     let doc = read_part(&bytes, "word/document.xml");
     assert!(!doc.contains("<m:oMath"), "no OMML when native math is off");
-    assert!(doc.contains("Cambria Math"), "falls back to Cambria Math text");
+    assert!(
+        doc.contains("Cambria Math"),
+        "falls back to Cambria Math text"
+    );
 }
 
 #[test]
@@ -439,7 +451,10 @@ fn math_metacharacters_are_xml_escaped() {
     let doc = document("Compare $a < b$ and $c & d$.");
     assert!(doc.contains("&lt;"), "less-than escaped");
     assert!(doc.contains("&amp;"), "ampersand escaped");
-    assert!(!doc.contains("<m:t xml:space=\"preserve\">a < b"), "no raw <");
+    assert!(
+        !doc.contains("<m:t xml:space=\"preserve\">a < b"),
+        "no raw <"
+    );
 }
 
 #[test]
@@ -478,3 +493,89 @@ fn deeply_nested_math_does_not_crash_the_converter() {
     assert_eq!(&bytes[..2], b"PK");
 }
 
+// ---- Theming: fonts, sizes, colours, and the TOML config file --------------
+
+/// Convert with custom options and return a named part.
+fn part_with(markdown: &str, opts: &ConvertOptions, name: &str) -> String {
+    let bytes = to_bytes_with(markdown, opts).expect("conversion should succeed");
+    read_part(&bytes, name)
+}
+
+#[test]
+fn custom_heading_colour_and_size_reach_styles_xml() {
+    let opts = ConvertOptions {
+        heading_color: "C00000".to_string(),
+        heading_sizes_pt: [33.0, 18.0, 15.0, 13.0, 12.0, 11.0],
+        ..ConvertOptions::default()
+    };
+    let styles = part_with("# Title", &opts, "word/styles.xml");
+    assert!(
+        styles.contains("w:val=\"C00000\""),
+        "heading colour applied"
+    );
+    // 33pt -> 66 half-points on Heading1.
+    assert!(styles.contains("w:sz w:val=\"66\""), "heading size applied");
+}
+
+#[test]
+fn custom_link_colour_reaches_hyperlink_style() {
+    let opts = ConvertOptions {
+        link_color: "FF8800".to_string(),
+        ..ConvertOptions::default()
+    };
+    let styles = part_with("[x](https://e.com)", &opts, "word/styles.xml");
+    assert!(styles.contains("w:val=\"FF8800\""), "link colour applied");
+}
+
+#[test]
+fn theme_from_toml_overlays_only_set_fields() {
+    let theme = Theme::from_toml_str(
+        r##"
+        body_font     = "Georgia"
+        heading_color = "#1F3864"
+        heading_sizes = [22, 18, 15, 13, 12, 11]
+        page          = "letter"
+        "##,
+    )
+    .expect("valid theme");
+    let mut opts = ConvertOptions::default();
+    let original_code_font = opts.code_font.clone();
+    theme.apply(&mut opts).expect("apply should succeed");
+
+    assert_eq!(opts.body_font, "Georgia");
+    assert_eq!(opts.heading_color, "1F3864"); // normalised: `#` stripped, upper
+    assert_eq!(opts.heading_sizes_pt[0], 22.0);
+    assert_eq!(opts.code_font, original_code_font, "unset fields untouched");
+    assert_eq!(opts.page, rust_knit_md_docx::PageSetup::LETTER);
+}
+
+#[test]
+fn theme_rejects_invalid_hex_colour() {
+    let theme = Theme::from_toml_str(r#"heading_color = "nothex""#).unwrap();
+    let mut opts = ConvertOptions::default();
+    assert!(theme.apply(&mut opts).is_err(), "bad hex must be rejected");
+}
+
+#[test]
+fn theme_rejects_wrong_number_of_heading_sizes() {
+    let theme = Theme::from_toml_str("heading_sizes = [18, 16, 14]").unwrap();
+    let mut opts = ConvertOptions::default();
+    assert!(theme.apply(&mut opts).is_err(), "need exactly six sizes");
+}
+
+#[test]
+fn theme_rejects_unknown_key() {
+    assert!(
+        Theme::from_toml_str("bogus_key = 1").is_err(),
+        "unknown keys should surface as errors, not be silently ignored"
+    );
+}
+
+#[test]
+fn theme_can_toggle_rendering_options() {
+    let theme = Theme::from_toml_str("smart = true\ngfm = false").unwrap();
+    let mut opts = ConvertOptions::default();
+    theme.apply(&mut opts).unwrap();
+    assert!(opts.smart_punctuation);
+    assert!(!opts.gfm);
+}

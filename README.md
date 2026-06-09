@@ -76,17 +76,58 @@ cat notes.md | knit-md-docx - -o out.docx
 
 # Options
 knit-md-docx in.md \
-  --page a4 \                # letter (default) | a4
+  --page letter \            # a4 (default) | letter
   --smart \                  # typographic punctuation
   --soft-breaks \            # single newlines become line breaks
   --no-gfm \                 # disable tables/tasklists/footnotes/strikethrough/alerts
   --no-anchors \             # don't emit heading bookmarks
   --body-font "Georgia" \
+  --heading-font "Georgia" \
   --code-font "Cascadia Code" \
-  --body-size 12
+  --body-size 12 \
+  --code-size 10 \
+  --caption-size 9 \
+  --heading-scale 1.25 \     # multiply every heading size
+  --heading-color 1F3864 \   # 6-digit hex, leading # optional
+  --link-color 0563C1 \
+  --caption-color 44546A \
+  --quote-color 404040 \
+  --code-fill F6F8FA
 ```
 
 Run `knit-md-docx --help` for the full list.
+
+### Theme files
+
+Every styling knob (and the rendering toggles) can live in a TOML theme file,
+applied with `--config`. Individual CLI flags override the file, which overrides
+the built-in defaults:
+
+```sh
+knit-md-docx in.md --config theme.toml --heading-color C00000
+```
+
+```toml
+# theme.toml — all keys are optional; absent keys keep their default
+body_font     = "Georgia"
+heading_font  = "Georgia"
+code_font     = "Cascadia Code"
+body_size     = 11.5
+code_size     = 10.0
+caption_size  = 9.0
+heading_sizes = [22, 18, 15, 13, 12, 11]   # exactly six: H1..H6
+heading_color = "#1F3864"                  # 6-digit hex, `#` optional
+link_color    = "0563C1"
+caption_color = "44546A"
+quote_color   = "404040"
+code_fill     = "F6F8FA"                    # code-block shading
+inline_code_fill = "EEF1F4"
+header_fill   = "F2F2F2"                    # table header shading
+quote_indent  = 720                         # twips (1440 = 1 inch)
+page          = "a4"                        # letter | a4
+smart         = true                        # rendering toggles, too
+soft_breaks   = false
+```
 
 ## Library usage
 

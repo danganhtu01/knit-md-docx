@@ -22,20 +22,9 @@ pub(crate) const HYPERLINK: &str = "Hyperlink";
 /// Paragraph style for image captions / definition-list definitions.
 pub(crate) const CAPTION: &str = "Caption";
 
-/// Heading sizes in half-points (H1..H6): 18, 16, 14, 13, 12, 11 pt.
-const HEADING_HALF_PT: [usize; 6] = [36, 32, 28, 26, 24, 22];
-/// Word's default heading accent colour.
-const HEADING_COLOR: &str = "000000";
-/// Shading fill behind code blocks (GitHub-ish light grey).
-pub(crate) const CODE_FILL: &str = "F6F8FA";
-/// Shading fill behind inline code spans (kept coherent with [`CODE_FILL`]).
-pub(crate) const INLINE_CODE_FILL: &str = "EEF1F4";
-/// Shading fill behind table header cells.
-pub(crate) const HEADER_FILL: &str = "F2F2F2";
-/// Colour used for image-alt captions / muted text.
-pub(crate) const CAPTION_COLOR: &str = "44546A";
-/// Hyperlink colour.
-const LINK_COLOR: &str = "0563C1";
+// Note: heading sizes, accent/link/caption/quote colours, and the code/inline/
+// header shading fills are no longer hardcoded here — they live on
+// [`ConvertOptions`] so they can be overridden via the CLI or a theme file.
 
 /// Apply page geometry, document defaults, and register every style the engine
 /// uses. Returns the configured (still empty) document.
@@ -77,8 +66,8 @@ pub(crate) fn setup(mut docx: Docx, opts: &ConvertOptions) -> Docx {
             .based_on("Normal")
             .next("Normal")
             .outline_lvl(i)
-            .size(HEADING_HALF_PT[i])
-            .color(HEADING_COLOR)
+            .size(opts.heading_half_points(i + 1))
+            .color(opts.heading_color.clone())
             .bold()
             .line_spacing(
                 LineSpacing::new()
@@ -104,8 +93,8 @@ pub(crate) fn setup(mut docx: Docx, opts: &ConvertOptions) -> Docx {
             .name("Quote")
             .based_on("Normal")
             .italic()
-            .color("404040")
-            .indent(Some(720), None, None, None),
+            .color(opts.quote_color.clone())
+            .indent(Some(opts.quote_indent_twips), None, None, None),
     );
 
     // Code block paragraph (runs also set the monospace font explicitly so the
@@ -119,7 +108,7 @@ pub(crate) fn setup(mut docx: Docx, opts: &ConvertOptions) -> Docx {
                     .ascii(opts.code_font.clone())
                     .hi_ansi(opts.code_font.clone()),
             )
-            .size(20),
+            .size(opts.code_half_points()),
     );
 
     // Caption (image alt fallback, definition bodies).
@@ -128,8 +117,8 @@ pub(crate) fn setup(mut docx: Docx, opts: &ConvertOptions) -> Docx {
             .name("Caption")
             .based_on("Normal")
             .italic()
-            .color(CAPTION_COLOR)
-            .size(18),
+            .color(opts.caption_color.clone())
+            .size(opts.caption_half_points()),
     );
 
     // Inline code character style.
@@ -141,14 +130,14 @@ pub(crate) fn setup(mut docx: Docx, opts: &ConvertOptions) -> Docx {
                     .ascii(opts.code_font.clone())
                     .hi_ansi(opts.code_font.clone()),
             )
-            .size(20),
+            .size(opts.code_half_points()),
     );
 
     // Hyperlink character style.
     docx = docx.add_style(
         Style::new(HYPERLINK, StyleType::Character)
             .name("Hyperlink")
-            .color(LINK_COLOR)
+            .color(opts.link_color.clone())
             .underline("single"),
     );
 

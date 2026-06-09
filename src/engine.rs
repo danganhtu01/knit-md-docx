@@ -670,7 +670,7 @@ impl<'a> Engine<'a> {
                     Shading::new()
                         .shd_type(ShdType::Clear)
                         .color("auto")
-                        .fill(styles::INLINE_CODE_FILL),
+                        .fill(self.opts.inline_code_fill.clone()),
                 );
         }
         r
@@ -870,7 +870,7 @@ impl<'a> Engine<'a> {
                     let r = self
                         .styled_run(&format!("[image: {label}]"), false)
                         .italic()
-                        .color(styles::CAPTION_COLOR);
+                        .color(self.opts.caption_color.clone());
                     self.emit_run(r);
                 }
             }
@@ -891,7 +891,7 @@ impl<'a> Engine<'a> {
                         .ascii(self.opts.code_font.clone())
                         .hi_ansi(self.opts.code_font.clone()),
                 )
-                .size(20)
+                .size(self.opts.code_half_points())
                 .add_text((*line).to_string());
             para = para.add_run(r);
             if i + 1 < n {
@@ -906,7 +906,7 @@ impl<'a> Engine<'a> {
                 Shading::new()
                     .shd_type(ShdType::Clear)
                     .color("auto")
-                    .fill(styles::CODE_FILL),
+                    .fill(self.opts.code_fill.clone()),
             )
             .add_paragraph(para);
         // `without_borders` keeps the shaded box but drops the default black grid.
@@ -951,7 +951,7 @@ impl<'a> Engine<'a> {
                 Shading::new()
                     .shd_type(ShdType::Clear)
                     .color("auto")
-                    .fill(styles::HEADER_FILL),
+                    .fill(self.opts.header_fill.clone()),
             );
         }
         t.cur_row.push(cell);
