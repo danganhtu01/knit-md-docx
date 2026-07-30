@@ -293,19 +293,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "docx-rs"
-version = "0.4.20"
-dependencies = [
- "base64",
- "image",
- "quick-xml",
- "serde",
- "serde_json",
- "thiserror",
- "zip 8.6.0",
-]
-
-[[package]]
 name = "encoding_rs"
 version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -487,6 +474,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "knit-md-docx-rs"
+version = "0.4.20"
+dependencies = [
+ "base64",
+ "image",
+ "quick-xml",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "zip 8.6.0",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.186"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -662,8 +662,8 @@ version = "0.1.0"
 dependencies = [
  "base64",
  "clap",
- "docx-rs",
  "image",
+ "knit-md-docx-rs",
  "pulldown-cmark",
  "zip 0.6.6",
 ]

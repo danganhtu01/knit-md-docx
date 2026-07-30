@@ -18,16 +18,29 @@ path = "src/lib.rs"
 [[bin]]
 name = "knit-md-docx"
 path = "src/main.rs"
+# The binary is the only thing that needs clap. Without this, `cargo build` and
+# `cargo test` fail whenever the `cli` feature is off, because `src/main.rs`
+# imports clap unconditionally.
+required-features = ["cli"]
 
 [dependencies]
 # Forked docx-rs with native OMML (oMath) equations, run-level
 # superscript/subscript, and paragraph borders for thematic breaks.
-# See https://github.com/danganhtu01/docx-rs
-docx-rs = { path = "../docx-rs/docx-core" }
+#
+# Path, not registry: the fork is kept in-repo by owner decision, and the crate
+# is renamed on crates.io side anyway — the package here is `knit-md-docx-rs`,
+# so the dependency key needs an explicit `package =`.
+docx-rs = { package = "knit-md-docx-rs", path = "../knit-md-docx-rs/docx-core" }
 pulldown-cmark = { version = "0.13.4", default-features = false }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "bmp", "webp"] }
 base64 = "0.22"
-clap = { version = "4", features = ["derive"] }
+clap = { version = "4", features = ["derive"], optional = true }
+
+[features]
+# The library is the point; the CLI is a convenience. Consumers that embed this
+# crate (ff-lc-app knits markdown in-process) should not build clap.
+default = ["cli"]
+cli = ["dep:clap"]
 
 [dev-dependencies]
 zip = "0.6"
