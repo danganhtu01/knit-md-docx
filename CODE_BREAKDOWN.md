@@ -1,5 +1,7 @@
 # Code Breakdown — `rust_knit_md_docx` and its `docx-rs` fork
 
+Referenced by: [`MASTER.md`](MASTER.md).
+
 A plain-language tour of every Rust file across both projects, written for a
 non-coder. It explains what each file is for and what each function does.
 
