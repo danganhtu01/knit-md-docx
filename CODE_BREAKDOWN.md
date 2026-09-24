@@ -79,11 +79,13 @@ the engine.
 This turns the crate into a terminal program called `knit-md-docx`.
 
 - **`Cli` (struct)** — the list of options the command accepts (input file,
-  `-o output`, `--page a4`, `--smart`, `--no-gfm`, `--body-font`, etc.). The
-  `clap` library reads these from what the user types.
+  `-o output`, `--page a4`, `--smart`, `--no-gfm`, `--body-font`, `--lang de-DE`,
+  etc.). The `clap` library reads these from what the user types. The input is
+  required unless `--version` (`-V`) is given, which prints the bare version
+  number (like `0.2.0`) so an installer can compare it with a release tag.
 - **`Page` (enum)** — just the two allowed page sizes: `Letter` or `A4`.
-- **`main()`** — the starting point. It reads the command-line arguments, runs the
-  conversion, and prints either "Wrote …" or an error. It returns a
+- **`main()`** — the starting point. It reads the command-line arguments, answers
+  `--version` itself, otherwise runs the conversion, and prints either "Wrote …" or an error. It returns a
   success/failure code to the operating system.
 - **`run(cli)`** — the actual work: read the input (from a file, or from "standard
   input" if you pass `-`), figure out the output filename, assemble the settings
@@ -108,8 +110,10 @@ This turns the crate into a terminal program called `knit-md-docx`.
   area (page minus margins) — used later to scale images so they fit.
 - **`ConvertOptions` (struct)** — every knob: whether GitHub extensions are on,
   smart punctuation, math, the `native_math` and `super_sub` flags, fonts, body
-  size, page setup, and the folder to resolve images against. `Default` fills in
-  sensible values (GFM on, math on, Calibri body font, Letter page).
+  size, page setup, and the folder to resolve images against. It also carries
+  `lang`, the document language (`None` means: take the front matter's `lang:`,
+  else `DEFAULT_LANG`, which is `en-US`). `Default` fills in sensible values (GFM
+  on, math on, Calibri body font, Letter page; the command line defaults to A4).
 - **`body_half_points()`** — Word measures font size in **half-points**, so this
   doubles your point size (11pt → 22).
 - **`cmark_options()`** — translates your settings into the exact switches the
@@ -125,8 +129,10 @@ stays visually consistent. This file defines them once.
 - A block of **constants** — the names and colors used throughout: heading style
   IDs, the "Quote" style, the code-block style, the inline-code character style,
   hyperlink style, shading colors (e.g. the light grey behind code), etc.
-- **`setup(docx, opts)`** — the only function. It takes a blank document and
-  stamps it with: the page size and margins, the default font and size,
+- **`setup(docx, opts, lang)`** — the only function. It takes a blank document and
+  stamps it with: the page size and margins, the default font and size, the
+  document language (`w:lang`), no East Asian compatibility flags (they made
+  LibreOffice push words in justified lines past the margin),
   comfortable line spacing, and the full set of styles (Heading 1–6 with their
   sizes/colors/outline levels, the Quote style, the code style, the caption style,
   inline-code, and hyperlink). After this runs, the document "knows" what a
@@ -168,6 +174,10 @@ stage directions read aloud in order. The engine reacts to each.
 - **`build_docx(md, opts)`** — the entry point. It pre-scans footnotes, walks the
   whole event stream, then assembles the final document (styles + numbering
   definitions + all the blocks). Returns the finished document object.
+- **`document_lang(md, opts)`** — decides the document language: the option if
+  one was given, else a `lang:` line in the front matter (read by
+  **`front_matter_lang`**, which only looks inside a leading `---` block that is
+  properly closed), else `en-US`. A `de_DE` spelling becomes `de-DE`.
 - **`collect_footnotes(md, opts)`** — a *first pass* that renders every footnote's
   body in advance. Word stores a footnote's text at the spot where it's
   referenced, so the engine needs the body ready before it hits the reference.
@@ -321,11 +331,13 @@ parts (like a fraction's top and bottom), it calls *itself* to handle those part
 
 ### `tests/conversion.rs` — the proof it works
 
-About 40 automated checks. Each one converts a snippet of Markdown, unzips the
+More than 40 automated checks. Each one converts a snippet of Markdown, unzips the
 resulting `.docx`, and verifies the XML contains what it should: headings get
 heading styles, lists produce numbering, tables have aligned columns, math
 produces equation XML, `^x^` produces superscript, metacharacters are escaped,
-deeply-nested math doesn't crash, a URL with a caret isn't broken, and so on.
+deeply-nested math doesn't crash, a URL with a caret isn't broken, the
+document language comes from the option or the front matter, the East Asian
+flags are gone, and so on.
 These run automatically and fail loudly if a future change breaks something.
 
 ---
@@ -397,6 +409,23 @@ These five are the only ones that matter for your three features:
   declaration to the document's root tag. That's the namespace announcement that
   tells Word "this file may contain math (`m:`) elements." Without it, Word rejects
   every equation.
+
+The document-language work (2026-09-24) added or changed these:
+
+- **`documents/elements/lang.rs`** *(new)* — **`Lang`**, the `w:lang` tag that
+  says which language a run's text is in (`val` for Latin text, plus optional
+  `east_asia` and `bidi`). Word and LibreOffice pick spelling, hyphenation and
+  line breaking by it.
+- **`run_property.rs`**, **`run.rs`**, **`run_property_default.rs`**,
+  **`doc_defaults.rs`**, **`styles.rs`** and **`documents/mod.rs`** — a `lang(...)`
+  method at each level, up to **`Docx::default_lang()`**, the one this crate uses.
+- **`documents/settings.rs`** — **`east_asian_compat(bool)`**, a switch for five
+  compatibility flags a Japanese Word template writes and upstream always emitted
+  (`balanceSingleByteDoubleByteWidth`, `useFELayout` and three more). On by
+  default as upstream; this crate turns it off, through
+  **`Docx::east_asian_compat(false)`**.
+- **`reader/run_property.rs`**, **`reader/xml_element.rs`** — reading `w:lang`
+  back from an existing `.docx`.
 
 ### Why this split (your crate vs. the fork) matters
 

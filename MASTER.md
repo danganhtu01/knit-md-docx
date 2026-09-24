@@ -44,3 +44,7 @@ tag that does not match `Cargo.toml`, or a binary whose `--version` does not pri
 | [`DOCX_RS_REV`](DOCX_RS_REV) | the knit-md-docx-rs commit a release is built against; move it when the fork changes |
 | [`.github/workflows/release.yml`](.github/workflows/release.yml) | on a `v*` tag: tests, builds the Linux musl and Windows binaries, publishes them with `SHA256SUMS` |
 | [`.gitignore`](.gitignore), [`.gitattributes`](.gitattributes), [`.dockerignore`](.dockerignore) | ignore, attribute and Docker build-context rules |
+
+**Carried graph warning.** `examples/sample.md` points at no other file (`NO-OUTBOUND`). It is
+the demo input the tool is run on, and a link added to it would be knitted into every sample
+document, so the warning is carried by decision.
