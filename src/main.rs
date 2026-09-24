@@ -9,10 +9,15 @@ use rust_knit_md_docx::{ConvertOptions, PageSetup};
 
 /// Knit a Markdown file into a Word .docx with high fidelity.
 #[derive(Parser, Debug)]
-#[command(name = "knit-md-docx", version, about, long_about = None)]
+#[command(name = "knit-md-docx", about, long_about = None, disable_version_flag = true)]
 struct Cli {
     /// Input Markdown file. Use `-` to read from standard input.
-    input: PathBuf,
+    #[arg(required_unless_present = "version")]
+    input: Option<PathBuf>,
+
+    /// Print the version, plain semver, and exit.
+    #[arg(short = 'V', long)]
+    version: bool,
 
     /// Output .docx path. Defaults to the input path with a `.docx` extension
     /// (or `out.docx` when reading from stdin).
@@ -51,6 +56,12 @@ struct Cli {
     /// Body font size in points.
     #[arg(long)]
     body_size: Option<f32>,
+
+    /// Document language, a BCP 47 tag: en-US, en-GB, de-DE, it-IT, ... Sets
+    /// spelling, hyphenation and line breaking in Word and LibreOffice. Default:
+    /// the front matter's `lang:`, else en-US.
+    #[arg(long)]
+    lang: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
@@ -61,6 +72,11 @@ enum Page {
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
+    if cli.version {
+        // Plain semver, so an installer can compare it with a release tag.
+        println!("{}", env!("CARGO_PKG_VERSION"));
+        return ExitCode::SUCCESS;
+    }
     match run(cli) {
         Ok(out) => {
             eprintln!("Wrote {}", out.display());
@@ -74,16 +90,17 @@ fn main() -> ExitCode {
 }
 
 fn run(cli: Cli) -> Result<PathBuf, Box<dyn std::error::Error>> {
-    let from_stdin = cli.input.as_os_str() == "-";
+    let input = cli.input.expect("clap requires an input unless --version");
+    let from_stdin = input.as_os_str() == "-";
 
     let (markdown, base_dir, default_out) = if from_stdin {
         let mut s = String::new();
         std::io::stdin().read_to_string(&mut s)?;
         (s, None, PathBuf::from("out.docx"))
     } else {
-        let s = std::fs::read_to_string(&cli.input)?;
-        let base = cli.input.parent().map(|p| p.to_path_buf());
-        let out = cli.input.with_extension("docx");
+        let s = std::fs::read_to_string(&input)?;
+        let base = input.parent().map(|p| p.to_path_buf());
+        let out = input.with_extension("docx");
         (s, base, out)
     };
 
@@ -101,6 +118,7 @@ fn run(cli: Cli) -> Result<PathBuf, Box<dyn std::error::Error>> {
         },
         ..ConvertOptions::default()
     };
+    opts.lang = cli.lang;
     if let Some(f) = cli.body_font {
         opts.body_font = f;
     }

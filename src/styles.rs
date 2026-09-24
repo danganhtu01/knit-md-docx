@@ -39,7 +39,9 @@ const LINK_COLOR: &str = "0563C1";
 
 /// Apply page geometry, document defaults, and register every style the engine
 /// uses. Returns the configured (still empty) document.
-pub(crate) fn setup(mut docx: Docx, opts: &ConvertOptions) -> Docx {
+/// `lang` is the document language, already resolved from the options and the
+/// front matter (see [`crate::engine::document_lang`]).
+pub(crate) fn setup(mut docx: Docx, opts: &ConvertOptions, lang: &str) -> Docx {
     let m = opts.page.margin as i32;
     let margin = PageMargin {
         top: m,
@@ -61,6 +63,12 @@ pub(crate) fn setup(mut docx: Docx, opts: &ConvertOptions) -> Docx {
                 .east_asia(opts.body_font.clone()),
         )
         .default_size(opts.body_half_points())
+        // Latin-script text: tag the language, and leave out the East Asian
+        // compatibility flags upstream docx-rs writes by default. With
+        // `balanceSingleByteDoubleByteWidth` LibreOffice measures "≈" or "ẹ" at
+        // East Asian widths and justified lines overrun the right margin.
+        .default_lang(Lang::new(lang))
+        .east_asian_compat(false)
         // ~1.08 line height with 8pt after each paragraph, matching Word's
         // modern default so the body does not render cramped.
         .default_line_spacing(

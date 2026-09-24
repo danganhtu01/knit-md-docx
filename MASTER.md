@@ -20,6 +20,10 @@ cargo run --bin knit-md-docx -- examples/sample.md    # writes examples/sample.d
 cargo check --no-default-features --lib           # the library alone, without clap
 ```
 
+**Releasing.** Set `version` in `Cargo.toml`, put the knit-md-docx-rs commit to build against in
+`DOCX_RS_REV` (it must be on GitHub), commit, then push a tag `v<version>`. The workflow refuses a
+tag that does not match `Cargo.toml`, or a binary whose `--version` does not print it.
+
 ## Map
 
 | File | What it is |
@@ -37,4 +41,6 @@ cargo check --no-default-features --lib           # the library alone, without c
 | [`tests/conversion.rs`](tests/conversion.rs) | integration tests that open the written `.docx` |
 | [`examples/sample.md`](examples/sample.md) | a sample exercising every supported feature |
 | [`LICENSE-MIT`](LICENSE-MIT), [`LICENSE-APACHE`](LICENSE-APACHE) | the dual licence |
+| [`DOCX_RS_REV`](DOCX_RS_REV) | the knit-md-docx-rs commit a release is built against; move it when the fork changes |
+| [`.github/workflows/release.yml`](.github/workflows/release.yml) | on a `v*` tag: tests, builds the Linux musl and Windows binaries, publishes them with `SHA256SUMS` |
 | [`.gitignore`](.gitignore), [`.gitattributes`](.gitattributes), [`.dockerignore`](.dockerignore) | ignore, attribute and Docker build-context rules |

@@ -7,7 +7,7 @@ non-coder. It explains what each file is for and what each function does.
 
 - **`rust_knit_md_docx`** — your crate (the program you run): reads Markdown,
   writes a Word `.docx`.
-- **`docx-rs`** (fork: <https://github.com/danganhtu01/docx-rs>) — the library
+- **`docx-rs`** (fork: <https://github.com/danganhtu01/knit-md-docx-rs>) — the library
   that physically builds the `.docx`.
 
 ---

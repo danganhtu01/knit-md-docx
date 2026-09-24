@@ -46,6 +46,10 @@ impl Default for PageSetup {
     }
 }
 
+/// The language a document is tagged with when neither the options nor the
+/// front matter name one.
+pub const DEFAULT_LANG: &str = "en-US";
+
 /// Knobs controlling how Markdown is rendered into Word.
 #[derive(Clone, Debug)]
 pub struct ConvertOptions {
@@ -87,6 +91,11 @@ pub struct ConvertOptions {
     pub body_size_pt: f32,
     /// Page geometry.
     pub page: PageSetup,
+    /// Document language, a BCP 47 tag such as `en-US`, `de-DE` or `it-IT`,
+    /// written as the document-default `w:lang`. Word and LibreOffice pick
+    /// spelling, hyphenation and line-breaking rules by it. `None` takes the
+    /// YAML front matter's `lang:` when there is one, else [`DEFAULT_LANG`].
+    pub lang: Option<String>,
 }
 
 impl Default for ConvertOptions {
@@ -108,6 +117,7 @@ impl Default for ConvertOptions {
             code_font: "Consolas".to_string(),
             body_size_pt: 11.0,
             page: PageSetup::default(),
+            lang: None,
         }
     }
 }

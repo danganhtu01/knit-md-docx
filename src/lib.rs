@@ -44,7 +44,7 @@ mod styles;
 pub use docx_rs;
 pub use docx_rs::Docx;
 pub use error::{Error, Result};
-pub use options::{ConvertOptions, PageSetup};
+pub use options::{ConvertOptions, DEFAULT_LANG, PageSetup};
 
 use std::io::Cursor;
 use std::path::Path;

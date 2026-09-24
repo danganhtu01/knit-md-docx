@@ -18,7 +18,7 @@ use pulldown_cmark::{
     Alignment, BlockQuoteKind, CowStr, Event, Parser, Tag, TagEnd, TextMergeStream,
 };
 
-use crate::options::ConvertOptions;
+use crate::options::{ConvertOptions, DEFAULT_LANG};
 use crate::styles;
 
 /// A finished, fully-resolved inline element belonging to the paragraph being
@@ -137,6 +137,42 @@ struct Engine<'a> {
     flatten_links: bool,
 }
 
+/// The document language: the options' `lang`, else the YAML front matter's
+/// top-level `lang:` (the key pandoc reads), else [`DEFAULT_LANG`].
+pub(crate) fn document_lang(md: &str, opts: &ConvertOptions) -> String {
+    let chosen = opts
+        .lang
+        .clone()
+        .or_else(|| opts.yaml_front_matter.then(|| front_matter_lang(md)).flatten())
+        .unwrap_or_else(|| DEFAULT_LANG.to_string());
+    // `de_DE` is a common spelling of the BCP 47 tag `de-DE`.
+    chosen.replace('_', "-")
+}
+
+/// `lang:` from a leading `---` block closed by `---` or `...`, as
+/// pulldown-cmark recognises front matter; `None` when there is no such block.
+fn front_matter_lang(md: &str) -> Option<String> {
+    let md = md.strip_prefix('\u{feff}').unwrap_or(md);
+    let mut lines = md.lines();
+    if lines.next()?.trim_end() != "---" {
+        return None;
+    }
+    let mut found = None;
+    for line in lines {
+        let t = line.trim_end();
+        if t == "---" || t == "..." {
+            return found;
+        }
+        if let Some(v) = t.strip_prefix("lang:") {
+            let v = v.trim().trim_matches(|c| c == '"' || c == '\'');
+            if !v.is_empty() {
+                found = Some(v.to_string());
+            }
+        }
+    }
+    None
+}
+
 /// Public entry point used by `lib.rs`: build a `Docx` from Markdown.
 pub(crate) fn build_docx(md: &str, opts: &ConvertOptions) -> Docx {
     let footnotes = collect_footnotes(md, opts);
@@ -146,7 +182,7 @@ pub(crate) fn build_docx(md: &str, opts: &ConvertOptions) -> Docx {
     eng.process_events(parser);
     eng.finish();
 
-    let mut docx = styles::setup(Docx::new(), opts);
+    let mut docx = styles::setup(Docx::new(), opts, &document_lang(md, opts));
     for a in std::mem::take(&mut eng.abstracts) {
         docx = docx.add_abstract_numbering(a);
     }

@@ -1,4 +1,4 @@
-# rust_knit_md_docx
+# knit-md-docx (`rust_knit_md_docx`)
 
 > Knit Markdown into a Microsoft Word `.docx` — with high fidelity.
 
@@ -38,11 +38,19 @@ The output opens cleanly in Microsoft Word, LibreOffice Writer, and Google Docs
 | `$math$`, `$$math$$` | **Native Word equations** (OMML / `m:oMath`) via a LaTeX-subset translator |
 | `^sup^`, `~sub~`, `<sup>`, `<sub>` | Real superscript / subscript runs (`w:vertAlign`) |
 | inline HTML (`<b>`, `<br>`, `<mark>`, …) | A best-effort subset mapped to runs |
-| YAML front matter | Parsed and **not** rendered into the body |
+| YAML front matter | Parsed and **not** rendered into the body; its `lang:` sets the document language |
 
 ## Install
 
 ### As a command-line tool
+
+Prebuilt binaries are attached to each [release](https://github.com/danganhtu01/knit-md-docx/releases):
+`knit-md-docx-x86_64-unknown-linux-musl.tar.gz` (a static Linux binary),
+`knit-md-docx-x86_64-pc-windows-msvc.zip`, and `SHA256SUMS` to check them against.
+terminal-config installs the tool this way on every machine.
+
+To build it yourself, check out [`knit-md-docx-rs`](https://github.com/danganhtu01/knit-md-docx-rs)
+beside this repository first (see below), then:
 
 ```sh
 cargo install --path .
@@ -54,13 +62,15 @@ cargo build --release   # binary at target/release/knit-md-docx
 
 ```toml
 [dependencies]
-rust_knit_md_docx = { git = "https://github.com/danganhtu01/rust_knit_md_docx" }
+rust_knit_md_docx = { path = "../knit-md-docx" }
 ```
 
-> This crate depends on a [fork of `docx-rs`](https://github.com/danganhtu01/docx-rs)
-> (for native equations, vertical-alignment runs, and paragraph borders), wired up
-> as a `path` dependency in [`Cargo.toml`](Cargo.toml). Point it at your checkout of
-> the fork, or switch it to a `git` dependency.
+> This crate depends on a [fork of `docx-rs`](https://github.com/danganhtu01/knit-md-docx-rs)
+> (for native equations, vertical-alignment runs, paragraph borders and language
+> tagging), wired up as a `path` dependency on `../knit-md-docx-rs/docx-core` in
+> [`Cargo.toml`](Cargo.toml), so both repositories are checked out side by side. The
+> release workflow checks the fork out at the commit named in
+> [`DOCX_RS_REV`](DOCX_RS_REV).
 
 ## Command-line usage
 
@@ -76,7 +86,8 @@ cat notes.md | knit-md-docx - -o out.docx
 
 # Options
 knit-md-docx in.md \
-  --page a4 \                # letter (default) | a4
+  --page letter \            # a4 (default) | letter
+  --lang de-DE \             # document language; default: front matter `lang:`, else en-US
   --smart \                  # typographic punctuation
   --soft-breaks \            # single newlines become line breaks
   --no-gfm \                 # disable tables/tasklists/footnotes/strikethrough/alerts
@@ -138,8 +149,8 @@ sizes in **half-points**, and image dimensions in **EMU** (1px = 9525 EMU).
 
 ## Native equations, superscript & rules — a forked `docx-rs`
 
-Three features need OOXML surface the published `docx-rs 0.4.20` does not expose,
-so this crate depends on a small [**fork**](https://github.com/danganhtu01/docx-rs)
+These features need OOXML surface the published `docx-rs 0.4.20` does not expose,
+so this crate depends on a small [**fork**](https://github.com/danganhtu01/knit-md-docx-rs)
 (wired up via a `path`/`git` dependency) that adds:
 
 - **OMML equations** — an `OMath` / `OMathElement` tree that emits `m:oMath`
@@ -147,11 +158,27 @@ so this crate depends on a small [**fork**](https://github.com/danganhtu01/docx-
   functions) plus the `xmlns:m` namespace on `w:document`.
 - **`Run::superscript()` / `Run::subscript()`** — run-level `w:vertAlign`.
 - **`Paragraph::set_borders()`** — paragraph borders (used for the rule).
+- **`Docx::default_lang()`** and **`Docx::east_asian_compat()`** — the document
+  language (`w:lang`), and a switch for the East Asian compatibility flags that
+  upstream writes into every `settings.xml`.
 
 [`src/math.rs`](src/math.rs) translates a useful subset of LaTeX math into that
 `OMath` tree, so `$x^2$` and `$$\frac{a}{b}$$` become **real, editable Word
 equations** rather than styled text. Unrecognised LaTeX degrades to literal text,
 so nothing is ever lost.
+
+## Language
+
+The document is tagged with one language, written as the document-default
+`w:lang`: Word and LibreOffice choose spelling, hyphenation and line-breaking rules
+by it. It is `--lang` (or `ConvertOptions::lang`), else the front matter's `lang:`,
+else `en-US`. English, German and Italian (`en-US`, `en-GB`, `de-DE`, `it-IT`) are
+what it is used for; any BCP 47 tag is written as given, with `_` read as `-`.
+
+The East Asian compatibility flags upstream `docx-rs` writes into `settings.xml`
+(`balanceSingleByteDoubleByteWidth`, `useFELayout` and three more) are left out.
+With them, LibreOffice measured characters such as `≈` and `ẹ` at East Asian widths
+and pushed words in justified lines past the right margin.
 
 ## Known limitations
 
@@ -189,7 +216,7 @@ These are rendered as documented fallbacks rather than failing:
 
 ```sh
 cargo build
-cargo test          # 36 integration + 12 unit (math) + 3 doc-tests
+cargo test          # integration, unit (math) and doc tests
 cargo run --bin knit-md-docx -- examples/sample.md   # produces examples/sample.docx
 ```
 

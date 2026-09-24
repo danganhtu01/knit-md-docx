@@ -478,3 +478,61 @@ fn deeply_nested_math_does_not_crash_the_converter() {
     assert_eq!(&bytes[..2], b"PK");
 }
 
+
+// ---- Language (R-0930: English, German and Italian text) ------------------
+
+/// The document-default language written in styles.xml.
+fn default_lang(bytes: &[u8]) -> String {
+    let styles = read_part(bytes, "word/styles.xml");
+    let defaults = &styles[styles.find("<w:docDefaults>").expect("docDefaults")..];
+    let at = defaults.find("<w:lang w:val=\"").expect("a default w:lang") + 15;
+    defaults[at..at + defaults[at..].find('"').unwrap()].to_string()
+}
+
+fn with_lang(markdown: &str, lang: Option<&str>) -> Vec<u8> {
+    let opts = ConvertOptions {
+        lang: lang.map(str::to_string),
+        ..ConvertOptions::default()
+    };
+    to_bytes_with(markdown, &opts).unwrap()
+}
+
+#[test]
+fn language_defaults_to_english() {
+    assert_eq!(default_lang(&to_bytes("Hello.").unwrap()), "en-US");
+}
+
+#[test]
+fn language_comes_from_the_options() {
+    for tag in ["de-DE", "it-IT", "en-GB"] {
+        assert_eq!(default_lang(&with_lang("Text.", Some(tag))), tag);
+    }
+    assert_eq!(default_lang(&with_lang("Text.", Some("de_DE"))), "de-DE");
+}
+
+#[test]
+fn language_comes_from_front_matter_unless_the_options_name_one() {
+    let md = "---\ntitle: Prova\nlang: it-IT\n---\n\nCiao.";
+    assert_eq!(default_lang(&with_lang(md, None)), "it-IT");
+    assert_eq!(default_lang(&with_lang(md, Some("de-DE"))), "de-DE");
+    let quoted = "---\nlang: \"de-DE\"\n...\n\nHallo.";
+    assert_eq!(default_lang(&with_lang(quoted, None)), "de-DE");
+    // Not front matter: `lang:` in the body is text, and an unclosed block is no block.
+    assert_eq!(default_lang(&with_lang("Text\n\nlang: de-DE", None)), "en-US");
+    assert_eq!(default_lang(&with_lang("---\nlang: de-DE\n", None)), "en-US");
+}
+
+#[test]
+fn settings_carry_no_east_asian_compatibility_flags() {
+    let settings = part("Größe ≈ 3, perché ẹ.", "word/settings.xml");
+    for flag in [
+        "balanceSingleByteDoubleByteWidth",
+        "useFELayout",
+        "spaceForUL",
+        "doNotLeaveBackslashAlone",
+        "ulTrailSpace",
+    ] {
+        assert!(!settings.contains(flag), "settings.xml still carries {flag}");
+    }
+    assert!(settings.contains("compatibilityMode"), "the compat block is kept");
+}
