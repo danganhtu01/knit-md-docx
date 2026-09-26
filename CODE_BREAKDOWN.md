@@ -131,8 +131,8 @@ stays visually consistent. This file defines them once.
   hyperlink style, shading colors (e.g. the light grey behind code), etc.
 - **`setup(docx, opts, lang)`** — the only function. It takes a blank document and
   stamps it with: the page size and margins, the default font and size, the
-  document language (`w:lang`), no East Asian compatibility flags (they made
-  LibreOffice push words in justified lines past the margin),
+  document language (`w:lang`), no East Asian compatibility flags (why: the
+  Language section of [`README.md`](README.md)),
   comfortable line spacing, and the full set of styles (Heading 1–6 with their
   sizes/colors/outline levels, the Quote style, the code style, the caption style,
   inline-code, and hyperlink). After this runs, the document "knows" what a
