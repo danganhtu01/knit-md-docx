@@ -2,7 +2,7 @@
 name = "rust_knit_md_docx"
 version = "0.2.0"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.99"
 description = "Knit Markdown (CommonMark + GitHub Flavored Markdown) into a Word .docx with high fidelity"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/danganhtu01/knit-md-docx"
