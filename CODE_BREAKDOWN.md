@@ -157,13 +157,13 @@ stage directions read aloud in order. The engine reacts to each.
 - **`Inline`** — one finished small piece of a paragraph: a run of text, a
   hyperlink, or (new) an equation.
 - **`BlockOut`** — a finished big piece: a paragraph or a table.
-- **`InlineFmt`** — counters for what formatting is currently "switched on": bold,
+- **`InlineFmt`** — counters for what formatting is "switched on" at that point: bold,
   italic, strikethrough, underline, highlight, code, superscript, subscript.
   They're *counters* not on/off switches because formatting can nest (bold inside
   bold).
 - **`ListCtx` / `ItemCtx`** — track the current list and list item (its number,
   whether it's a checkbox task, etc.).
-- **`LinkCtx` / `ImageCtx`** — the link or image currently being built.
+- **`LinkCtx` / `ImageCtx`** — the link or image being built.
 - **`TableBuilder`** — accumulates a table cell by cell until it's complete.
 - **`Engine`** — holds all of the above plus the growing list of finished blocks,
   the footnote bodies, counters for numbering and bookmarks, and the current quote
@@ -211,7 +211,7 @@ stage directions read aloud in order. The engine reacts to each.
 - **`on_soft_break()`** — a single newline in the source becomes either a space or
   a real line break, per your settings.
 - **`styled_run(text, is_code)`** — the workhorse that builds **one run of text**
-  stamped with whatever formatting is currently switched on (bold, italic,
+  stamped with whatever formatting is switched on at that point (bold, italic,
   superscript, code shading, …). A "run" is Word's term for a stretch of text that
   all looks the same.
 - **`emit_run(r)`** — files a finished run into the right place: the open link, the
