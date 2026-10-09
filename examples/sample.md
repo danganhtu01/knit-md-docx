@@ -13,8 +13,9 @@ line that should join with a space.
 ## Inline elements
 
 A [normal external link](https://example.com), an autolink <https://rust-lang.org>,
-an email autolink <hello@example.com>, and an [internal link](#lists) to a later
-heading. Inline math like $E = mc^2$ becomes a native Word equation.
+an email autolink <hello@example.com>, an [internal link](#lists) to a later
+heading, and a [relative link](../README.md) to a file beside the document.
+Inline math like $E = mc^2$ becomes a native Word equation.
 
 Hard break below:
 first line\
