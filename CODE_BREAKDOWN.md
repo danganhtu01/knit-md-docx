@@ -44,7 +44,7 @@ docx-rs (the fork)  ──builds──▶  the XML  ──zips──▶  output.
 
 ---
 
-## Part 2 — Your crate, `rust_knit_md_docx` (8 files)
+## Part 2 — Your crate, `rust_knit_md_docx` (9 files)
 
 ### `lib.rs` — the front desk
 
@@ -79,8 +79,8 @@ the engine.
 This turns the crate into a terminal program called `knit-md-docx`.
 
 - **`Cli` (struct)** — the list of options the command accepts (input file,
-  `-o output`, `--page a4`, `--smart`, `--no-gfm`, `--body-font`, `--lang de-DE`,
-  etc.). The `clap` library reads these from what the user types. The input is
+  `-o output`, `--config theme.toml`, `--page a4`, `--smart`, `--no-gfm`,
+  `--body-font`, `--heading-color`, `--heading-scale`, `--lang de-DE`, etc.). The `clap` library reads these from what the user types. The input is
   required unless `--version` (`-V`) is given, which prints the bare version
   number (like `0.2.0`) so an installer can compare it with a release tag.
 - **`Page` (enum)** — just the two allowed page sizes: `Letter` or `A4`.
@@ -88,14 +88,19 @@ This turns the crate into a terminal program called `knit-md-docx`.
   `--version` itself, otherwise runs the conversion, and prints either "Wrote …" or an error. It returns a
   success/failure code to the operating system.
 - **`run(cli)`** — the actual work: read the input (from a file, or from "standard
-  input" if you pass `-`), figure out the output filename, assemble the settings
-  from the flags, and call `write_file_with`. It returns the output path so `main`
+  input" if you pass `-`), figure out the output filename, assemble the settings,
+  and call `write_file_with`. The settings are layered: the built-in defaults (A4
+  for the command line), then the theme file from `--config`, then the individual
+  flags, which go through the same `Theme` so their colours are checked the same
+  way; `--heading-scale` multiplies the heading sizes last. It returns the output path so `main`
   can report it.
 
 ### `error.rs` — how problems are reported
 
-- **`Error` (enum)** — the three kinds of failure: `Io` (couldn't read/write a
-  file), `Pack` (the zip step failed), `Input` (the Markdown was unusable).
+- **`Error` (enum)** — the four kinds of failure: `Io` (couldn't read/write a
+  file), `Pack` (the zip step failed), `Input` (the Markdown was unusable),
+  `Config` (a theme file or flag held a bad value: a colour that is not six hex
+  digits, not exactly six heading sizes, an unknown page size or key).
 - **`Display`** — turns an error into a human-readable sentence ("I/O error: …").
 - **`source`** / **`From<io::Error>`** — plumbing that lets these errors chain
   nicely and lets file errors auto-convert into our error type.
@@ -109,26 +114,41 @@ This turns the crate into a terminal program called `knit-md-docx`.
   are pre-filled sizes. `content_width()` / `content_height()` compute the usable
   area (page minus margins) — used later to scale images so they fit.
 - **`ConvertOptions` (struct)** — every knob: whether GitHub extensions are on,
-  smart punctuation, math, the `native_math` and `super_sub` flags, fonts, body
-  size, page setup, and the folder to resolve images against. It also carries
+  smart punctuation, math, the `native_math` and `super_sub` flags, fonts, the
+  sizes (body, code, caption, the six headings), the colours (heading, link,
+  caption, quote) and shading fills (code block, inline code, table header), the
+  quote indent, page setup, and the folder to resolve images against. It also carries
   `lang`, the document language (`None` means: take the front matter's `lang:`,
   else `DEFAULT_LANG`, which is `en-US`). `Default` fills in sensible values (GFM
   on, math on, Calibri body font, Letter page; the command line defaults to A4).
 - **`body_half_points()`** — Word measures font size in **half-points**, so this
-  doubles your point size (11pt → 22).
+  doubles your point size (11pt → 22). `code_half_points()`, `caption_half_points()` and
+  `heading_half_points(level)` do the same for the other sizes.
 - **`cmark_options()`** — translates your settings into the exact switches the
   Markdown parser understands (turn on tables, footnotes, math, superscript,
   etc.). This is the bridge between "your preferences" and "the parser's
   vocabulary."
+
+### `config.rs` — theme files
+
+- **`Theme` (struct)** — the same knobs as `ConvertOptions`, each optional, read
+  from a TOML file (`--config theme.toml`). A key that is left out keeps its
+  value, and an unknown key is an error rather than being silently ignored.
+- **`from_toml_str` / `from_toml_file`** — parse a theme from text or from a file.
+- **`apply(opts)`** — lays every key that is set onto a `ConvertOptions`, checking
+  the colours, that `heading_sizes` lists exactly six, and the page name.
+- **`normalize_hex`** — accepts `#1F3864` or `1f3864` and stores `1F3864`.
+- **`parse_page`** — `letter` or `a4`, in any case.
 
 ### `styles.rs` — the look-and-feel
 
 Word documents use named **styles** (like "Heading 1") so the whole document
 stays visually consistent. This file defines them once.
 
-- A block of **constants** — the names and colors used throughout: heading style
-  IDs, the "Quote" style, the code-block style, the inline-code character style,
-  hyperlink style, shading colors (e.g. the light grey behind code), etc.
+- A block of **constants** — the style names used throughout: heading style IDs,
+  the "Quote" style, the code-block style, the inline-code character style, the
+  hyperlink style, the caption style. The sizes, colours and fills are not here:
+  they come from `ConvertOptions`, so a theme can change them.
 - **`setup(docx, opts, lang)`** — the only function. It takes a blank document and
   stamps it with: the page size and margins, the default font and size, the
   document language (`w:lang`), no East Asian compatibility flags (why: the

@@ -36,6 +36,7 @@ tag that does not match `Cargo.toml`, or a binary whose `--version` does not pri
 | [`src/engine.rs`](src/engine.rs) | folds the Markdown event stream into Word paragraphs, runs, tables, lists and footnotes |
 | [`src/math.rs`](src/math.rs) | the LaTeX-subset to OMML equation translator |
 | [`src/options.rs`](src/options.rs) | `ConvertOptions` and `PageSetup` |
+| [`src/config.rs`](src/config.rs) | `Theme`: a TOML theme file (`--config`) laid onto `ConvertOptions` |
 | [`src/styles.rs`](src/styles.rs) | the Word styles the output carries |
 | [`src/error.rs`](src/error.rs) | the error type |
 | [`tests/conversion.rs`](tests/conversion.rs) | integration tests that open the written `.docx` |

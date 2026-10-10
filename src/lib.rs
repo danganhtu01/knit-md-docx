@@ -35,12 +35,14 @@
 //! let _ = docx; // a `docx_rs::Docx` you can further customise and pack yourself
 //! ```
 
+mod config;
 mod engine;
 mod error;
 mod math;
 mod options;
 mod styles;
 
+pub use config::{Theme, normalize_hex, parse_page};
 pub use docx_rs;
 pub use docx_rs::Docx;
 pub use error::{Error, Result};
