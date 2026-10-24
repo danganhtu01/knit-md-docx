@@ -143,7 +143,11 @@ pub(crate) fn document_lang(md: &str, opts: &ConvertOptions) -> String {
     let chosen = opts
         .lang
         .clone()
-        .or_else(|| opts.yaml_front_matter.then(|| front_matter_lang(md)).flatten())
+        .or_else(|| {
+            opts.yaml_front_matter
+                .then(|| front_matter_lang(md))
+                .flatten()
+        })
         .unwrap_or_else(|| DEFAULT_LANG.to_string());
     // `de_DE` is a common spelling of the BCP 47 tag `de-DE`.
     chosen.replace('_', "-")
