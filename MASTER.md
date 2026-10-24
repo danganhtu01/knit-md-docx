@@ -44,6 +44,8 @@ refuses code that fails `cargo fmt --check` or `cargo clippy -D warnings` (the L
 | [`src/error.rs`](src/error.rs) | the error type |
 | [`tests/conversion.rs`](tests/conversion.rs) | integration tests that open the written `.docx` |
 | [`examples/sample.md`](examples/sample.md) | a sample exercising every supported feature |
+| [`scripts/release.sh`](scripts/release.sh) | publishes a release: tags a commit `v<version>`, pushes the tag, follows the workflow, checks the assets and `SHA256SUMS`, prints their checksums; `--dry-run` only checks (his run card, K-007, R-2343) |
+| [`scripts/test-release.sh`](scripts/test-release.sh) | proves `release.sh`'s refusals and its dry run, with no network write |
 | [`LICENSE-MIT`](LICENSE-MIT), [`LICENSE-APACHE`](LICENSE-APACHE) | the dual licence |
 | [`DOCX_RS_REV`](DOCX_RS_REV) | the knit-md-docx-rs commit a release is built against; move it when the fork changes |
 | [`.github/workflows/release.yml`](.github/workflows/release.yml) | on a `v*` tag: lints (fmt and clippy), tests, builds the Linux musl and Windows binaries, publishes them with `SHA256SUMS` |
