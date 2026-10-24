@@ -5,6 +5,7 @@
 #   SHA256SUMS
 # The docx-rs fork is a path dependency on ../knit-md-docx-rs/docx-core, so the fork is
 # checked out beside this repository at the commit DOCX_RS_REV names.
+# The release refuses code that fails cargo fmt --check or clippy -D warnings.
 name: Release
 
 on:
@@ -51,10 +52,18 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
+          components: clippy, rustfmt
 
       - name: musl tools
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Lint
+        if: runner.os == 'Linux'
+        working-directory: knit-md-docx
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets --locked -- -D warnings
 
       - name: Test
         working-directory: knit-md-docx

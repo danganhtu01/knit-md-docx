@@ -493,7 +493,6 @@ fn deeply_nested_math_does_not_crash_the_converter() {
     assert_eq!(&bytes[..2], b"PK");
 }
 
-
 // ---- Language (R-0930: English, German and Italian text) ------------------
 
 /// The document-default language written in styles.xml.
@@ -533,8 +532,14 @@ fn language_comes_from_front_matter_unless_the_options_name_one() {
     let quoted = "---\nlang: \"de-DE\"\n...\n\nHallo.";
     assert_eq!(default_lang(&with_lang(quoted, None)), "de-DE");
     // Not front matter: `lang:` in the body is text, and an unclosed block is no block.
-    assert_eq!(default_lang(&with_lang("Text\n\nlang: de-DE", None)), "en-US");
-    assert_eq!(default_lang(&with_lang("---\nlang: de-DE\n", None)), "en-US");
+    assert_eq!(
+        default_lang(&with_lang("Text\n\nlang: de-DE", None)),
+        "en-US"
+    );
+    assert_eq!(
+        default_lang(&with_lang("---\nlang: de-DE\n", None)),
+        "en-US"
+    );
 }
 
 #[test]
@@ -547,9 +552,15 @@ fn settings_carry_no_east_asian_compatibility_flags() {
         "doNotLeaveBackslashAlone",
         "ulTrailSpace",
     ] {
-        assert!(!settings.contains(flag), "settings.xml still carries {flag}");
+        assert!(
+            !settings.contains(flag),
+            "settings.xml still carries {flag}"
+        );
     }
-    assert!(settings.contains("compatibilityMode"), "the compat block is kept");
+    assert!(
+        settings.contains("compatibilityMode"),
+        "the compat block is kept"
+    );
 }
 
 // ---- Theming: fonts, sizes, colours, and the TOML config file --------------
@@ -644,5 +655,8 @@ fn theme_can_set_the_language() {
     let theme = Theme::from_toml_str(r#"lang = "de-DE""#).unwrap();
     let mut opts = ConvertOptions::default();
     theme.apply(&mut opts).unwrap();
-    assert_eq!(default_lang(&to_bytes_with("Hallo.", &opts).unwrap()), "de-DE");
+    assert_eq!(
+        default_lang(&to_bytes_with("Hallo.", &opts).unwrap()),
+        "de-DE"
+    );
 }

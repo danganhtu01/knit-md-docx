@@ -196,18 +196,18 @@ impl Parser {
 
         // Control symbols: a backslash followed by a single non-letter, e.g.
         // `\{`, `\,`, `\%`. These are taken as one char.
-        if let Some(c) = self.peek() {
-            if !c.is_alphabetic() {
-                self.bump();
-                if let Some(s) = control_symbol(c) {
-                    return if s.is_empty() {
-                        Vec::new()
-                    } else {
-                        vec![OMathElement::Run(s.to_string())]
-                    };
-                }
-                return vec![OMathElement::Run(c.to_string())];
+        if let Some(c) = self.peek()
+            && !c.is_alphabetic()
+        {
+            self.bump();
+            if let Some(s) = control_symbol(c) {
+                return if s.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![OMathElement::Run(s.to_string())]
+                };
             }
+            return vec![OMathElement::Run(c.to_string())];
         }
 
         let name = self.read_command_name();
@@ -272,11 +272,11 @@ impl Parser {
             Some('\\') => {
                 self.bump();
                 // `\{` / `\}` / `\langle` etc.
-                if let Some(c) = self.peek() {
-                    if !c.is_alphabetic() {
-                        self.bump();
-                        return control_symbol(c).unwrap_or("").to_string();
-                    }
+                if let Some(c) = self.peek()
+                    && !c.is_alphabetic()
+                {
+                    self.bump();
+                    return control_symbol(c).unwrap_or("").to_string();
                 }
                 let name = self.read_command_name();
                 command_text(&name).unwrap_or("").to_string()
@@ -368,7 +368,11 @@ impl Parser {
             i += 1;
         }
         // Ensure the command name ends here (next char is not a letter).
-        !self.chars.get(i).copied().is_some_and(|c| c.is_alphabetic())
+        !self
+            .chars
+            .get(i)
+            .copied()
+            .is_some_and(|c| c.is_alphabetic())
     }
 }
 
@@ -440,16 +444,16 @@ fn recurse_merge(el: OMathElement) -> OMathElement {
 /// Map an n-ary command to its operator glyph.
 fn nary_operator(cmd: &str) -> Option<&'static str> {
     Some(match cmd {
-        "sum" => "\u{2211}",     // ∑
-        "prod" => "\u{220F}",    // ∏
-        "coprod" => "\u{2210}",  // ∐
-        "int" => "\u{222B}",     // ∫
-        "iint" => "\u{222C}",    // ∬
-        "iiint" => "\u{222D}",   // ∭
-        "oint" => "\u{222E}",    // ∮
-        "bigcup" => "\u{22C3}",  // ⋃
-        "bigcap" => "\u{22C2}",  // ⋂
-        "bigoplus" => "\u{2A01}", // ⨁
+        "sum" => "\u{2211}",       // ∑
+        "prod" => "\u{220F}",      // ∏
+        "coprod" => "\u{2210}",    // ∐
+        "int" => "\u{222B}",       // ∫
+        "iint" => "\u{222C}",      // ∬
+        "iiint" => "\u{222D}",     // ∭
+        "oint" => "\u{222E}",      // ∮
+        "bigcup" => "\u{22C3}",    // ⋃
+        "bigcap" => "\u{22C2}",    // ⋂
+        "bigoplus" => "\u{2A01}",  // ⨁
         "bigotimes" => "\u{2A02}", // ⨂
         _ => return None,
     })
@@ -470,8 +474,8 @@ fn control_symbol(c: char) -> Option<&'static str> {
         ',' => "\u{2009}", // thin space
         ';' => "\u{2005}",
         ':' => "\u{2005}",
-        '!' => "",         // negative thin space → drop
-        '\\' => "\n",      // `\\` line break (rare in inline math)
+        '!' => "",    // negative thin space → drop
+        '\\' => "\n", // `\\` line break (rare in inline math)
         _ => return None,
     })
 }
@@ -756,7 +760,10 @@ mod tests {
         // stack. The depth guard turns the overflow into bounded literal text.
         let src = format!("{}x{}", "{".repeat(50_000), "}".repeat(50_000));
         let s = xml(&src, false);
-        assert!(s.contains("<m:oMath>"), "still produces a (bounded) equation");
+        assert!(
+            s.contains("<m:oMath>"),
+            "still produces a (bounded) equation"
+        );
     }
 
     #[test]
@@ -776,7 +783,10 @@ mod tests {
         // group structure (and its content) must survive intact.
         let s = xml("{a \\right b}", false);
         assert!(s.contains("<m:oMath>"));
-        assert!(s.contains('a') && s.contains('b'), "group content kept: {s}");
+        assert!(
+            s.contains('a') && s.contains('b'),
+            "group content kept: {s}"
+        );
         assert!(!s.contains("}"), "the literal close brace must not leak");
     }
 
@@ -784,9 +794,33 @@ mod tests {
     fn malformed_input_never_panics() {
         // None of these may panic, overflow, or hang; each yields some oMath.
         for c in [
-            "\\", "{", "}", "{{{", "}}}", "^", "_", "x^", "x_", "\\frac", "\\frac{a}", "\\sqrt",
-            "\\sqrt[", "\\sqrt[3]", "\\left(", "\\right)", "\\left( x", "\\sum", "\\sum_",
-            "\\sum_{", "a^^b", "a~~b", "\\\\", "{}", "_^_^", "\\frac{}{}", "\\left.\\right.",
+            "\\",
+            "{",
+            "}",
+            "{{{",
+            "}}}",
+            "^",
+            "_",
+            "x^",
+            "x_",
+            "\\frac",
+            "\\frac{a}",
+            "\\sqrt",
+            "\\sqrt[",
+            "\\sqrt[3]",
+            "\\left(",
+            "\\right)",
+            "\\left( x",
+            "\\sum",
+            "\\sum_",
+            "\\sum_{",
+            "a^^b",
+            "a~~b",
+            "\\\\",
+            "{}",
+            "_^_^",
+            "\\frac{}{}",
+            "\\left.\\right.",
         ] {
             assert!(xml(c, false).contains("<m:oMath>"), "no equation for {c:?}");
         }
