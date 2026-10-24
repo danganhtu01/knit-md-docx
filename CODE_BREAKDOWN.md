@@ -82,7 +82,7 @@ This turns the crate into a terminal program called `knit-md-docx`.
   `-o output`, `--config theme.toml`, `--page a4`, `--smart`, `--no-gfm`,
   `--body-font`, `--heading-color`, `--heading-scale`, `--lang de-DE`, etc.). The `clap` library reads these from what the user types. The input is
   required unless `--version` (`-V`) is given, which prints the bare version
-  number (like `0.2.0`) so an installer can compare it with a release tag.
+  number (like `0.3.0`) so an installer can compare it with a release tag.
 - **`Page` (enum)** — just the two allowed page sizes: `Letter` or `A4`.
 - **`main()`** — the starting point. It reads the command-line arguments, answers
   `--version` itself, otherwise runs the conversion, and prints either "Wrote …" or an error. It returns a

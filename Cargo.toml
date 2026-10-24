@@ -1,6 +1,6 @@
 [package]
 name = "rust_knit_md_docx"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2024"
 rust-version = "1.99"
 description = "Knit Markdown (CommonMark + GitHub Flavored Markdown) into a Word .docx with high fidelity"
