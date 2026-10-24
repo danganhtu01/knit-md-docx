@@ -552,18 +552,19 @@ impl<'a> Engine<'a> {
         let mut seg_start = 0;
         while i < t.len() {
             let b = bytes[i];
-            if (b == b'^' || b == b'~') && i + 1 < t.len() {
-                if let Some(end) = script_span(t, i, b) {
-                    if seg_start < i {
-                        let r = self.styled_run(&t[seg_start..i], false);
-                        self.emit_run(r);
-                    }
-                    let inner = &t[i + 1..end];
-                    self.emit_script(inner, b == b'^');
-                    i = end + 1;
-                    seg_start = i;
-                    continue;
+            if (b == b'^' || b == b'~')
+                && i + 1 < t.len()
+                && let Some(end) = script_span(t, i, b)
+            {
+                if seg_start < i {
+                    let r = self.styled_run(&t[seg_start..i], false);
+                    self.emit_run(r);
                 }
+                let inner = &t[i + 1..end];
+                self.emit_script(inner, b == b'^');
+                i = end + 1;
+                seg_start = i;
+                continue;
             }
             i += 1;
         }
@@ -738,13 +739,12 @@ impl<'a> Engine<'a> {
             return;
         }
         let mut prefix = None;
-        if let Some(item) = self.item_stack.last_mut() {
-            if let Some(checked) = item.task {
-                if !item.task_emitted {
-                    prefix = Some(checkbox_run(checked));
-                    item.task_emitted = true;
-                }
-            }
+        if let Some(item) = self.item_stack.last_mut()
+            && let Some(checked) = item.task
+            && !item.task_emitted
+        {
+            prefix = Some(checkbox_run(checked));
+            item.task_emitted = true;
         }
         let mut p = Paragraph::new();
         if let Some(r) = prefix {
@@ -784,14 +784,14 @@ impl<'a> Engine<'a> {
     /// two do not clobber each other (docx-rs keeps only the last `indPr`).
     fn decorate(&mut self, mut p: Paragraph) -> Paragraph {
         let mut numbered = false;
-        if let Some(list) = self.list_stack.last().copied() {
-            if let Some(item) = self.item_stack.last_mut() {
-                if item.task.is_none() && !item.numbered {
-                    p = p.numbering(NumberingId::new(list.num_id), IndentLevel::new(0));
-                    item.numbered = true;
-                    numbered = true;
-                }
-            }
+        if let Some(list) = self.list_stack.last().copied()
+            && let Some(item) = self.item_stack.last_mut()
+            && item.task.is_none()
+            && !item.numbered
+        {
+            p = p.numbering(NumberingId::new(list.num_id), IndentLevel::new(0));
+            item.numbered = true;
+            numbered = true;
         }
         if self.quote_depth > 0 {
             p = p.style(styles::QUOTE);

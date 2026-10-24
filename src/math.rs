@@ -196,18 +196,18 @@ impl Parser {
 
         // Control symbols: a backslash followed by a single non-letter, e.g.
         // `\{`, `\,`, `\%`. These are taken as one char.
-        if let Some(c) = self.peek() {
-            if !c.is_alphabetic() {
-                self.bump();
-                if let Some(s) = control_symbol(c) {
-                    return if s.is_empty() {
-                        Vec::new()
-                    } else {
-                        vec![OMathElement::Run(s.to_string())]
-                    };
-                }
-                return vec![OMathElement::Run(c.to_string())];
+        if let Some(c) = self.peek()
+            && !c.is_alphabetic()
+        {
+            self.bump();
+            if let Some(s) = control_symbol(c) {
+                return if s.is_empty() {
+                    Vec::new()
+                } else {
+                    vec![OMathElement::Run(s.to_string())]
+                };
             }
+            return vec![OMathElement::Run(c.to_string())];
         }
 
         let name = self.read_command_name();
@@ -272,11 +272,11 @@ impl Parser {
             Some('\\') => {
                 self.bump();
                 // `\{` / `\}` / `\langle` etc.
-                if let Some(c) = self.peek() {
-                    if !c.is_alphabetic() {
-                        self.bump();
-                        return control_symbol(c).unwrap_or("").to_string();
-                    }
+                if let Some(c) = self.peek()
+                    && !c.is_alphabetic()
+                {
+                    self.bump();
+                    return control_symbol(c).unwrap_or("").to_string();
                 }
                 let name = self.read_command_name();
                 command_text(&name).unwrap_or("").to_string()
